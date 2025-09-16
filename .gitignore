@@ -3,5 +3,7 @@ __pycache__/
 *.pyo
 .env
 .venv/
+venv/
+/*.egg-info/
 *.log
 
