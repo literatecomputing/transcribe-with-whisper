@@ -77,8 +77,14 @@ def main():
         sys.exit(1)
 
     inputfile = sys.argv[1]
-    speaker_names = sys.argv[2:] if len(sys.argv) > 2 else None
-    transcribe_video(inputfile, speaker_names)
+    speaker_names = sys.argv[2:]  # any extra args are speaker names
+
+    # Default speaker labels
+    # If user provides names, override defaults
+    for i, name in enumerate(speaker_names):
+        if i < len(default_speakers):
+            default_speakers[i] = name
+        transcribe_video(inputfile, default_speakers)
 
 if __name__ == "__main__":
     main()

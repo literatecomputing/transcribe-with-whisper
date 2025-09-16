@@ -88,24 +88,99 @@ def transcribe_segments(segment_files):
     return [f"{Path(f).stem}.vtt" for f in segment_files]
 
 def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermilli=2000):
+    # video_title is inputfile with no extension
+    video_title = os.path.splitext(inputfile)[0]
     html = []
-    preS = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>{inputfile}</title>
-<script>
-function jumptoTime(time){{
-    document.getElementsByTagName('video')[0].currentTime=time;
-}}
-</script>
-<style>
-body {{ font-family: sans-serif; background:#efe7dd; }}
-.e {{ margin-bottom:10px; padding:5px 30px; border-radius:20px; }}
-</style>
+    preS = f"""<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{inputfile}</title>
+    """ + """
+    <script>
+      var vidLinks = document.querySelectorAll('.lt a');
+      // for(var i = 0, l = vidLinks.length; ++i) {
+      //     makeVideoLink(vidLinks[i]);
+      // }
+
+      var v = document.getElementsByTagName('video')[0];
+      v.removeAttribute('controls') // '' in Chrome, "true" in FF9 (string)
+      v.controls // true
+      function jumptoTime(time){
+          var v = document.getElementsByTagName('video')[0];
+
+          window.console.log("jumping!!", time);
+          window.console.log("this",this);
+          window.console.log("vid",v);
+          v.currentTime = time;
+      }
+
+      function makeVideoLink(element){
+          // Extract the `t=` hash from the link
+          var timestamp = element.hash.match(/\d+$/,'')[0] * 1000;
+
+          element.addEventListener('click', function videoLinkClick(e){
+              jumpToTime(timestamp);
+
+              return false;
+          },false)
+      }
+    </script>
+    <style>
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            color: #111;
+            padding: 0 0 1em 0;
+	        background-color: #efe7dd;
+        }
+        table {
+             border-spacing: 10px;
+        }
+        th { text-align: left;}
+        .lt {
+          color: inherit;
+          text-decoration: inherit;
+        }
+        .l {
+          color: #050;
+        }
+        .s {
+            display: inline-block;
+        }
+        .c {
+            display: inline-block;
+        }
+        .e {
+            /*background-color: white; Changing background color */
+            border-radius: 20px; /* Making border radius */
+            width: fit-content; /* Making auto-sizable width */
+            height: fit-content; /* Making auto-sizable height */
+            padding: 5px 30px 5px 30px; /* Making space around letters */
+            font-size: 18px; /* Changing font size */
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+            /* white-space: nowrap; */
+        }
+
+        .t {
+            display: inline-block;
+        }
+        #player {
+            position: sticky;
+            top: 20px;
+            float: right;
+        }
+    </style>
 </head>
-<body>
-<video width="575" height="240" controls><source src="{inputfile}" type="video/mp4"></video>
+  <body>
+   """ + f"""
+    <h2>{video_title}</h2>
+    <i>Click on a word to jump to that section of the video<br></i>
+  <video id="player" style="border:none;" width="575" height="240" preload controls>
+    <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
+    </video>
+  <div  id="player"></div>
+<div class="e" style="background-color: white">
 """
     html.append(preS)
     def_boxclr, def_spkrclr = "white", "orange"
@@ -119,7 +194,7 @@ body {{ font-family: sans-serif; background:#efe7dd; }}
         for c in captions:
             start_sec = (shift + c[0]) / 1000
             startStr = f"{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{start_sec%60:05.2f}"
-            html.append(f'<a href="#{startStr}" onclick="jumptoTime({int(start_sec)})">{c[2]}</a><br>')
+            html.append(f'<a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a>')
         html.append("</div>")
     html.append("</body></html>")
     with open(outputHtml, "w", encoding="utf-8") as f:
@@ -171,8 +246,17 @@ def main():
         sys.exit(1)
 
     inputfile = sys.argv[1]
-    speaker_names = sys.argv[2:] if len(sys.argv) > 2 else None
-    transcribe_video(inputfile, speaker_names)
+    speaker_names = sys.argv[2:]  # any extra args are speaker names
+
+    # Default speaker labels
+    default_speakers = ["Speaker 1", "Speaker 2", "Speaker 3", "Speaker 4", "Speaker 5", "Speaker 6"]
+
+    # If user provides names, override defaults
+    for i, name in enumerate(speaker_names):
+        if i < len(default_speakers):
+            default_speakers[i] = name
+    transcribe_video(inputfile, default_speakers)    
+
 
 if __name__ == "__main__":
     main()
