@@ -1,4 +1,4 @@
-# whisper-transcribe-to-html
+# transcribe-with-whisper
 
 This script creates speaker-aware transcripts from video files, and
 outputs an HTML file where you can click on the transcript to jump to
@@ -24,9 +24,8 @@ The script checks to see what may be missing, so there's no harm in running it j
 
 The Windows installation instructions are written by ChatGPT and are not tested. The last version of Windows that I used for more than 15 minutes at a time was [Windows 95](https://en.wikipedia.org/wiki/Windows_95), and that was mostly to make it work for other people.
 
-
 | Requirement                                | Why it's needed                                           |
-|--------------------------------------------|-----------------------------------------------------------|
+| ------------------------------------------ | --------------------------------------------------------- |
 | **Python 3**                               | The script is written in Python.                          |
 | **ffmpeg**                                 | To convert video/audio files so the script can read them. |
 | **Hugging Face account + access token**    | For using the speech / speaker models.                    |
@@ -83,31 +82,32 @@ sudo apt install ffmpeg python3 python3-pip -y
 
 1. Install **Python 3** from [python.org](https://www.python.org/downloads/). During setup, choose the option to **Add Python to PATH**.
 2. Install **ffmpeg**:
-  * Option A: use **Chocolatey** (if you have it)
+
+- Option A: use **Chocolatey** (if you have it)
 
 ```
 choco install ffmpeg
 ```
 
-  * Option B: go to [ffmpeg.org/downloads](https://ffmpeg.org/download.html), download the build for Windows, and follow their instructions to put `ffmpeg.exe` somewhere in your PATH.
+- Option B: go to [ffmpeg.org/downloads](https://ffmpeg.org/download.html), download the build for Windows, and follow their instructions to put `ffmpeg.exe` somewhere in your PATH.
 
 ---
 
 ### 2. Get a Hugging Face account and access
 
-
-
 1. Go to [huggingface.co](huggingface.co) and **create a free account** if you don’t already have one.
 2. Request access to these models (you may need to accept licensing terms or fill out a request form):
-  * [`pyannote/speaker-diarization-3.1`](https://huggingface.co/pyannote/speaker-diarization-3.1)
-  * [`pyannote/segmentation`](https://huggingface.co/pyannote/segmentation)
+
+- [`pyannote/speaker-diarization-3.1`](https://huggingface.co/pyannote/speaker-diarization-3.1)
+- [`pyannote/segmentation`](https://huggingface.co/pyannote/segmentation)
 
 3. Generate an **Access Token**:
-  * Log in to your Hugging Face account
-  * Go to [Settings → Access Tokens](https://huggingface.co/settings/tokens)
-  * Click **“Create new token”** — you can name it anything (e.g. “transcribe-tool”)
-  * Grant **read** access (click "read" right next to "Fine-grained")
-  * Copy the token somewhere safe (you’ll use it soon and it won't show it again!)
+
+- Log in to your Hugging Face account
+- Go to [Settings → Access Tokens](https://huggingface.co/settings/tokens)
+- Click **“Create new token”** — you can name it anything (e.g. “transcribe-tool”)
+- Grant **read** access (click "read" right next to "Fine-grained")
+- Copy the token somewhere safe (you’ll use it soon and it won't show it again!)
 
 ---
 
@@ -115,7 +115,7 @@ choco install ffmpeg
 
 You need to tell your computer what your Hugging Face token is. This is so the script can access the models when it runs.
 
-* **macOS / Linux** (in Terminal)
+- **macOS / Linux** (in Terminal)
 
 **PAY ATTENTION HERE!** See where it says "your_token_here" in the section below? You'll need to edit the the commands below. The easiest way is to paste this and then hit the up arrow to get back to the "export" command, use the arrow keys (**YOUR MOUSE WILL NOT WORK!!!**), and paste (using the command-V key) the token there "your_token_here" was.
 
@@ -131,7 +131,7 @@ echo 'export HUGGING_FACE_AUTH_TOKEN=your_token_here' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-* **Windows** (PowerShell)
+- **Windows** (PowerShell)
 
 ```
 setx HUGGING_FACE_AUTH_TOKEN "your_token_here"
@@ -165,8 +165,8 @@ If you want to name the speakers yourself, you can provide names after the filen
 python3 transcribe.py myvideo.mp4 Alice Bob Charlie
 ```
 
-* The script will then label speakers using **Alice**, **Bob**, **Charlie** instead of “Speaker 1”, “Speaker 2”, etc.
-* If you don’t provide names, it will default to Speaker 1, 2, 3.
+- The script will then label speakers using **Alice**, **Bob**, **Charlie** instead of “Speaker 1”, “Speaker 2”, etc.
+- If you don’t provide names, it will default to Speaker 1, 2, 3.
 
 ---
 
@@ -174,50 +174,42 @@ python3 transcribe.py myvideo.mp4 Alice Bob Charlie
 
 After the script runs:
 
-* An HTML file, e.g. `myvideo.html` — open this in your web browser
-* The resulting page will show the video plus a transcript; clicking on transcript sections jumps the video to that moment
+- An HTML file, e.g. `myvideo.html` — open this in your web browser
+- The resulting page will show the video plus a transcript; clicking on transcript sections jumps the video to that moment
 
 ---
 
 ## ⚠️ Some helpful notes
 
-* The first time you run this, it may download some large model files. That is normal; it might take a few minutes depending on your internet speed.
+- The first time you run this, it may download some large model files. That is normal; it might take a few minutes depending on your internet speed.
 
-* On Macs with Apple Silicon (M1/M2/M3/M4), the default setup will still work, but performance may be slower than if you install optional “GPU / CoreML”-enabled packages.
+- On Macs with Apple Silicon (M1/M2/M3/M4), the default setup will still work, but performance may be slower than if you install optional “GPU / CoreML”-enabled packages.
 
-* If something fails (missing library, inaccessible model, missing token), the script will try to give a friendly error message. If you see a message you don’t understand, you can share it with someone technical or open an issue.
-
----
-
-## 🧰 Optional (for more advanced users)
-
-* You can add a `requirements.txt` so people can run:
-
-```
-pip install -r requirements.txt
-```
-
-* You might package this as a Python package so it’s installable via `pip install .`
+- If something fails (missing library, inaccessible model, missing token), the script will try to give a friendly error message. If you see a message you don’t understand, you can share it with someone technical or open an issue.
 
 ---
 
 ## ✅ Summary Checklist
 
-* Installed ffmpeg
-* Installed Python 3 + pip
-* Made a Hugging Face account
-* Requested access to required models
-* Created a Hugging Face token
-* Set the environment variable `HUGGING_FACE_AUTH_TOKEN`
-* Installed Python dependencies
-* Ran the script (with optional speaker names)
+- Installed ffmpeg
+- Installed Python 3 + pip
+- Made a Hugging Face account
+- Requested access to required models
+- Created a Hugging Face token
+- Set the environment variable `HUGGING_FACE_AUTH_TOKEN`
+- Installed Python dependencies
+- Ran the script (with optional speaker names)
 
 ---
 
 Thanks for using this tool! If you share feedback, suggestions, or report problems, happy to help.
 
-```
----
+### Optional GPU Support (for NVIDIA users)
 
-Do you want me to also generate a **`requirements.txt`** for this project so users can skip manually installing each dependency?
+If you have an NVIDIA GPU and want faster transcription:
+
+1. Install the GPU PyTorch wheels manually:
+
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
