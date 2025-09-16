@@ -204,10 +204,12 @@ After the script runs:
 
 Thanks for using this tool! If you share feedback, suggestions, or report problems, happy to help.
 
-### Optional GPU Support
+### Optional GPU Support (for NVIDIA users)
 
 If you have an NVIDIA GPU and want faster transcription:
 
+1. Install the GPU PyTorch wheels manually:
+
 ```bash
-pip install faster-whisper
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
