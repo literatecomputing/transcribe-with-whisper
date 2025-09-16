@@ -1,0 +1,5 @@
+pyannote.audio
+pydub
+faster-whisper
+webvtt-py
+huggingface_hub
