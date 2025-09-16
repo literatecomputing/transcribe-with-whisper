@@ -1,5 +1,7 @@
-pyannote.audio
+# Core dependencies
 pydub
-faster-whisper
 webvtt-py
+pyannote.audio
 huggingface_hub
+torch       # CPU-only by default
+faster-whisper

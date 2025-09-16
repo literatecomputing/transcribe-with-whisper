@@ -124,7 +124,7 @@ inputfile = sys.argv[1]
 speaker_names = sys.argv[2:]  # any extra args are speaker names
 
 # Default speaker labels
-default_speakers = ["Speaker 1", "Speaker 2", "Speaker 3"]
+default_speakers = ["Speaker 1", "Speaker 2", "Speaker 3", "Speaker 4", "Speaker 5", "Speaker 6"]
 
 # If user provides names, override defaults
 for i, name in enumerate(speaker_names):
