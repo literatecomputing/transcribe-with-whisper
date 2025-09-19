@@ -8,3 +8,4 @@ venv/
 *.log
 *.egg-info/
 venv
+uploads/
