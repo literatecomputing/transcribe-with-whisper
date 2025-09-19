@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install ffmpeg and runtime deps
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the package from PyPI by default; fallback to local copy if you build in-repo
+# Set this ARG at build time to switch sources: --build-arg INSTALL_FROM=local
+ARG INSTALL_FROM=pypi
+
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Install console package (pypi or local)
+COPY . /app
+RUN if [ "$INSTALL_FROM" = "local" ]; then \
+        pip install --no-cache-dir . ; \
+    else \
+        pip install --no-cache-dir transcribe-with-whisper ; \
+    fi
+
+# Create a mount point for user files
+VOLUME ["/data"]
+WORKDIR /data
+
+# Default entrypoint runs the CLI; you can override at runtime
+ENTRYPOINT ["transcribe-with-whisper"]
+CMD ["--help"]
