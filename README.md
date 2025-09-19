@@ -213,3 +213,37 @@ If you have an NVIDIA GPU and want faster transcription:
 ```bash
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
+
+## Docker
+
+Two Docker images are provided to avoid local dependency hassles (especially on macOS):
+
+- Web server (FastAPI): Dockerfile
+- CLI runner: Dockerfile.cli
+
+Build:
+
+```
+docker build -t tww-web -f Dockerfile .
+docker build -t tww-cli -f Dockerfile.cli .
+```
+
+Run the web UI (browse to http://localhost:5000):
+
+```
+docker run --rm -p 5000:5000 \
+   -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
+   -v $(pwd)/uploads:/app/uploads \
+   tww-web
+```
+
+Run the CLI in a container:
+
+```
+docker run --rm -it \
+   -e HUGGING_FACE_AUTH_TOKEN=hf_xxx \
+   -v $(pwd):/data \
+   tww-cli myfile.mp4 "Speaker 1" "Speaker 2"
+```
+
+The output HTML will appear in your mounted directory (`uploads/` for the web server, or the same folder as your media for CLI).
