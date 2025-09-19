@@ -53,16 +53,15 @@ To open a Terminal on a Mac, you can type a command-space and type "terminal". T
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
 
-2. Use Homebrew to install `ffmpeg`:
+2. Use Homebrew to install required components
 
 ```
 brew install ffmpeg
-```
-
-3. Make sure you have Python 3:
-
-```
-brew install python
+brew install python@3.11
+python3.11 -m venv venv
+source venv/bin/activate
+python3 -m pip install --upgrade pip setuptools wheel
+python3.11 -m pip install transcribe-with-whisper
 ```
 
 ---
