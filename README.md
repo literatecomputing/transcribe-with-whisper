@@ -12,6 +12,9 @@ I've tried very hard to make it work for people whose computer expertise include
 
 - Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now.
 - Separates who is speaking when (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model)
+
+https://huggingface.co/pyannote/segmentation-3.0
+
 - Transcribes each speaker's speech using the [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) Python library
 - Produces an HTML file: you click on parts of the transcript, the video jumps to that moment
 - The HTML file and the original video file are required to view the transcription in a web browser
@@ -43,11 +46,12 @@ A couple of AI Models available at [Hugging Face](https://huggingface.co/) are r
 
 - https://huggingface.co/join
 
-2. Request access to each of the required models--click "Use this model" for Pyannote.audio and accept their terms.
+2. Request access to each of the required models—click "Use this model" for pyannote.audio and accept their terms.
 
 - Required: pyannote/speaker-diarization-3.1 → https://huggingface.co/pyannote/speaker-diarization-3.1
-- Required: pyannote/segmentation → https://huggingface.co/pyannote/segmentation
-- On each model page, click Use this model” and select "pyannote.audio". Access is typically approved instantly for free use. After you have accepted it, you should see "**Gated Model** You have been granted access to this model". You can also check which models you have access to at https://huggingface.co/settings/gated-repos.
+- Required: pyannote/segmentation-3.0 → https://huggingface.co/pyannote/segmentation-3.0
+- On each model page, click “Use this model” and select "pyannote.audio". Access is typically approved instantly for free use. After you have accepted it, you should see "**Gated Model** You have been granted access to this model". You can also check which models you have access to at https://huggingface.co/settings/gated-repos.
+  - Note: Model pages may mention "pyannoteAI" as a production option. This project uses the open-source models; pyannoteAI is a separate commercial alternative.
 
 3. Create a read-access token
 
