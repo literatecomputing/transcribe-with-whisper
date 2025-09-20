@@ -8,6 +8,11 @@ from faster_whisper import WhisperModel
 import webvtt
 import re
 import warnings
+try:
+    import torchaudio  # type: ignore
+    _HAS_TORCHAUDIO = True
+except Exception:
+    _HAS_TORCHAUDIO = False
 
 warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
@@ -38,11 +43,16 @@ def get_diarization(inputWav, diarizationFile):
     if not auth_token:
         raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
 
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=auth_token)
-    DEMO_FILE = {"uri": "blabla", "audio": inputWav}
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=auth_token)
 
     if not os.path.isfile(diarizationFile):
-        dz = pipeline(DEMO_FILE)
+        if _HAS_TORCHAUDIO:
+            # Load audio into memory for faster processing
+            waveform, sample_rate = torchaudio.load(inputWav)
+            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate})
+        else:
+            # Fallback to file path if torchaudio is not available
+            dz = pipeline({"uri": "blabla", "audio": inputWav})
         with open(diarizationFile, "w") as f:
             f.write(str(dz))
     with open(diarizationFile) as f:
