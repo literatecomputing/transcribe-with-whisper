@@ -32,5 +32,4 @@ jobs:
 
       # No credentials necessary: https://pypi.org/manage/project/transcribe-with-whisper/settings/publishing/
       - name: Publish to PyPI
-        env:
         run: python -m twine upload dist/*
