@@ -73,13 +73,14 @@ def _validate_hf_token_or_die() -> None:
     )
   try:
     api = HfApi()
-    # Validate we can access the diarization model (permission + token format)
+    # Validate we can access the diarization and segmentation models
     api.model_info("pyannote/speaker-diarization", token=token)
-    print("✅ Hugging Face token validated and has access to pyannote/speaker-diarization.")
+    api.model_info("pyannote/segmentation-3.0", token=token)
+    print("✅ Hugging Face token validated (speaker-diarization and segmentation-3.0 accessible).")
   except Exception as e:
     raise RuntimeError(
       "Hugging Face token validation failed. Ensure the token is valid and has access to "
-      "'pyannote/speaker-diarization'. Original error: " + str(e)
+      "'pyannote/speaker-diarization' and 'pyannote/segmentation-3.0'. Original error: " + str(e)
     )
 
 
