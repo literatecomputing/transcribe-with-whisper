@@ -38,6 +38,8 @@ else
 fi
 out_dir="$(dirname "$out_abs")"
 out_base="$(basename "$out_abs")"
+out_ext="${out_base##*.}"
+out_ext="${out_ext,,}"
 
 mkdir -p "$out_dir"
 
@@ -63,23 +65,41 @@ function Div(el)
 end
 LUA
 
-if command -v pandoc >/dev/null 2>&1; then
+if [ "${PANDOC_USE_DOCKER:-0}" != "1" ] && command -v pandoc >/dev/null 2>&1; then
   # Use local pandoc
-  pandoc "$in_abs" --lua-filter "$lua_tmp" -o "$out_abs"
+  if [ "$out_ext" = "pdf" ]; then
+    # Prefer wkhtmltopdf if available to avoid LaTeX dependencies
+    if command -v wkhtmltopdf >/dev/null 2>&1; then
+      pandoc "$in_abs" --lua-filter "$lua_tmp" --pdf-engine wkhtmltopdf -o "$out_abs"
+    else
+      # Use TeX engine; ensure a language is set to avoid empty \setmainlanguage{}
+      pandoc "$in_abs" --lua-filter "$lua_tmp" \
+        --pdf-engine "${PDF_ENGINE:-xelatex}" \
+        -V lang="${PANDOC_LANG:-en}" \
+        -o "$out_abs"
+    fi
+  else
+    pandoc "$in_abs" --lua-filter "$lua_tmp" -o "$out_abs"
+  fi
 else
   # Fallback to Dockerized pandoc
   if ! command -v docker >/dev/null 2>&1; then
     echo "Error: neither pandoc nor docker is available." >&2
     exit 1
   fi
-  image="${PANDOC_IMAGE:-pandoc/core:latest}"
+  # Choose image: PDF requires LaTeX-enabled image
+  if [ "$out_ext" = "pdf" ]; then
+    image="${PANDOC_IMAGE:-pandoc/latex:latest}"
+  else
+    image="${PANDOC_IMAGE:-pandoc/core:latest}"
+  fi
   docker run --rm \
     -u "$(id -u)":"$(id -g)" \
     -v "$in_abs":/work/input.html:ro \
     -v "$out_dir":/out \
     -v "$lua_tmp":/filter.lua:ro \
     "$image" \
-    /work/input.html --lua-filter /filter.lua -o "/out/$out_base"
+    /work/input.html --lua-filter /filter.lua ${out_ext:+$([ "$out_ext" = pdf ] && echo --pdf-engine "${PDF_ENGINE:-xelatex}") } -o "/out/$out_base"
 fi
 
 echo "Wrote: $out_abs"
