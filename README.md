@@ -91,13 +91,13 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 #### Web User Interface
 
 ```
-docker run --rm -p 5000:5000 \
+docker run --rm -p 5001:5001 \
    -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
    -v "$(pwd)/uploads:/app/uploads" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
-After that, you can open http://localhost:5000 in your web browser. The transcribed file will open in your browser and also be in the uploads folder that is created in the folder/directory where you run the above command.
+After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the uploads folder that is created in the folder/directory where you run the above command.
 
 #### Command Line Interface
 
@@ -124,7 +124,7 @@ Usage:
 # Make sure they’re executable (first time only)
 chmod +x bin/*.sh
 
-# Web UI (then open http://localhost:5000)
+# Web UI (then open http://localhost:5001)
 export HUGGING_FACE_AUTH_TOKEN=hf_xxx
 ./bin/transcribe-with-whisper.sh
 
@@ -135,7 +135,7 @@ export HUGGING_FACE_AUTH_TOKEN=hf_xxx
 
 Environment overrides:
 
-- `TWW_PORT` — web port (default: 5000)
+- `TWW_PORT` — web port (default: 5001)
 - `TWW_UPLOADS_DIR` — host uploads directory for the web server (default: `./uploads`)
 - `TWW_CLI_MOUNT_DIR` — host directory to mount at `/data` for the CLI (default: current directory)
 
