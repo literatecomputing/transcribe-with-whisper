@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Convert an HTML file to DOCX using Pandoc in Docker, stripping links and any <div class="html-only"> blocks.
+# Convert an HTML file to DOCX, stripping links and any <div class="html-only"> blocks.
+# Prefers local pandoc if available; otherwise uses pandoc in Docker.
 # Usage: html-to-docx.sh input.html [output.docx]
 set -euo pipefail
-
-# Ensure docker is available
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Error: docker is required but not found in PATH." >&2
-  exit 1
-fi
 
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
   echo "Usage: $(basename "$0") input.html [output.docx]" >&2
@@ -46,8 +41,11 @@ out_base="$(basename "$out_abs")"
 
 mkdir -p "$out_dir"
 
-# Create a temporary Lua filter accessible to the container
+# Create a temporary Lua filter (works for both local and Docker pandoc)
 lua_tmp="$(mktemp)"
+cleanup() { rm -f "$lua_tmp"; }
+trap cleanup EXIT
+
 cat >"$lua_tmp" <<'LUA'
 function Link(el)
   -- Drop link wrapper, keep text
@@ -65,18 +63,23 @@ function Div(el)
 end
 LUA
 
-# Choose container image (override with PANDOC_IMAGE if desired)
-image="${PANDOC_IMAGE:-pandoc/core:latest}"
+if command -v pandoc >/dev/null 2>&1; then
+  # Use local pandoc
+  pandoc "$in_abs" --lua-filter "$lua_tmp" -o "$out_abs"
+else
+  # Fallback to Dockerized pandoc
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Error: neither pandoc nor docker is available." >&2
+    exit 1
+  fi
+  image="${PANDOC_IMAGE:-pandoc/core:latest}"
+  docker run --rm \
+    -u "$(id -u)":"$(id -g)" \
+    -v "$in_abs":/work/input.html:ro \
+    -v "$out_dir":/out \
+    -v "$lua_tmp":/filter.lua:ro \
+    "$image" \
+    /work/input.html --lua-filter /filter.lua -o "/out/$out_base"
+fi
 
-# Run Pandoc inside Docker. Mount input file, output dir, and lua filter.
-docker run --rm \
-  -u "$(id -u)":"$(id -g)" \
-  -v "$in_abs":/work/input.html:ro \
-  -v "$out_dir":/out \
-  -v "$lua_tmp":/filter.lua:ro \
-  "$image" \
-  /work/input.html --lua-filter /filter.lua -o "/out/$out_base"
-
-status=$?
-rm -f "$lua_tmp"
-exit $status
+echo "Wrote: $out_abs"
