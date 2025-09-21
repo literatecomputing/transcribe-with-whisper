@@ -184,14 +184,15 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
 </head>
   <body>
    """ + f"""
+    <div class="html-only">
     <h2>{video_title}</h2>
     <i>Click on a word to jump to that section of the video<br></i>
   <video id="player" style="border:none;" width="575" height="240" preload controls>
     <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
     </video>
-  <div  id="player"></div>
-<div class="e" style="background-color: white">
-"""
+    </div>
+  <div class="e" style="background-color: white">
+  """
     html.append(preS)
     def_boxclr, def_spkrclr = "white", "orange"
 
@@ -199,16 +200,17 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         shift = max(millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0]) - spacermilli, 0)
         speaker = g[0].split()[-1]
         spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
-        html.append(f'<div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
+        html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
         captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
         for c in captions:
             start_sec = (shift + c[0]) / 1000
             startStr = f"{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{start_sec%60:05.2f}"
-            html.append(f'<a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a>')
-        html.append("</div>")
-    html.append("</body></html>")
+            html.append(f'      <a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a>')
+        html.append("    </div>")
+    html.append("  </div> <!-- end of class e and speaker segments -->\n  </body>\n</html>")
     with open(outputHtml, "w", encoding="utf-8") as f:
         f.write("\n".join(html))
+    
 
 def cleanup(files):
     for f in files:
