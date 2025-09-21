@@ -1,8 +1,8 @@
 # transcribe-with-whisper
 
-This script creates speaker-aware transcripts from video files, and
-outputs an HTML file where you can click on the transcript to jump to
-the video. Works on macOS (Intel & Apple Silicon), Linux, and Windows.
+This set of tools is for people who need to transcribe video (or audio) files, but must protect the privacy of the people in the data set. This uses free AI tools and models to transcribe video and audio files to an HTML file that will show the transcript in your web browser and let you click on a word to be taken to that section of the original data file. A script to convert the HTML to docx is also included.
+
+It works on macOS (Intel & Apple Silicon), Linux, and Windows (not well tested).
 
 I've tried very hard to make it work for people whose computer expertise includes little more than being able to install computer programs from a web page and click on stuff in a web browser.
 
@@ -10,7 +10,8 @@ I've tried very hard to make it work for people whose computer expertise include
 
 ## What this does
 
-- Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now.
+- Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It should also work on audio-only files, though it may need some fairly simple modifications to do that.
+
 - Separates who is speaking when (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model)
 
 https://huggingface.co/pyannote/segmentation-3.0
@@ -30,9 +31,9 @@ I can't find a good source what languages are supported, but something that seem
 - A Hugging Face Auth Token
 - Python or Docker
 
-However you use this, you need to have a Hugging Face Auth Token to download the AI model that does diarization (distinguishing multiple speakers in the transcript). Details below.
+However you use this, you need to have a Hugging Face Auth Token to download the AI model ([What is a model?](https://huggingface.co/docs/hub/en/models)) that does diarization (distinguishing multiple speakers in the transcript). Details below.
 
-This is a Python package. If you're comfortable with Python, you can probably just `pip3 install transcribe-with-whisper` and the rest (like installing ffmpep) will make sense. After you install you would do something like "transcribe-with-whisper myvideofile.mp4 Harper Jordan Riley" and it'll create an HTML file with the transcript and a player for the video.
+This is a Python package. If you're comfortable with Python, you can probably just `pip3 install transcribe-with-whisper` and the rest (like installing `ffmpeg` with `brew`) will make sense. After you install you would do something like "transcribe-with-whisper myvideofile.mp4 Harper Jordan Riley" and it'll create an HTML file with the transcript and a player for the video.
 
 If you're not comfortable with Python, you can install [Docker Desktop](https://docs.docker.com/desktop/) (or Docker engine) and use a Docker container that's updated automatically, and similarly run a command, or start up a container that will let you provide the file and speaker names in your web browser.
 
@@ -256,10 +257,16 @@ After the script runs:
 
 ---
 
-## ⚠️ Some helpful notes
+##
 
-- The first time you run this, it may download some large model files. That is normal; it might take a few minutes depending on your internet speed.
+- The first time you run this, it may download some large model files. That is normal; it might take a few minutes depending on your internet speed. Subsequent runs will be much faster since those files will already have been downloaded.
 
-- On Macs with Apple Silicon (M1/M2/M3/M4), the default setup will still work, but performance may be slower than if you install optional “GPU / CoreML”-enabled packages.
+- On Macs with Apple Silicon (M1/M2/M3/M4), the default setup will still work, but performance may be slower than if you install optional “GPU / CoreML”-enabled packages (and have any idea what that means).
 
 - If something fails (missing library, inaccessible model, missing token), the script will try to give a friendly error message. If you see a message you don’t understand, you can share it with someone technical or open an issue.
+
+## Converting the HTML to a Word Processing document
+
+While the HTML is great for viewing the data, it's not convenient for other tools you might want to use. There is an `html-to-docx` script available that will convert the HTML into a docx file by default (you can also specify other formats like `html-to-docx file.html file.odt` or `html-to-docx file.html file.pdf`).
+
+Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension).
