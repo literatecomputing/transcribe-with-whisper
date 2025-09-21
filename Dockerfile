@@ -21,7 +21,7 @@ ENV UPLOAD_DIR=/app/uploads \
 RUN mkdir -p ${UPLOAD_DIR}
 
 # Expose FastAPI port
-EXPOSE 5000
+EXPOSE 5001
 
 # Start the FastAPI web server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "5001"]

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE="ghcr.io/literatecomputing/transcribe-with-whisper-web:latest"
-PORT="${TWW_PORT:-5000}"
+PORT="${TWW_PORT:-5001}"
 UPLOADS_DIR="${TWW_UPLOADS_DIR:-$(pwd)/uploads}"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -20,7 +20,7 @@ mkdir -p "${UPLOADS_DIR}"
 
 echo "Starting web UI on http://localhost:${PORT}"
 exec docker run --rm \
-  -p "${PORT}:5000" \
+  -p "${PORT}:5001" \
   --network=host \
   -e "HUGGING_FACE_AUTH_TOKEN=${HUGGING_FACE_AUTH_TOKEN}" \
   -v "${UPLOADS_DIR}:/app/uploads" \
