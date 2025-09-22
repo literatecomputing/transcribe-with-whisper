@@ -15,10 +15,10 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir fastapi uvicorn[standard] python-multipart \
     && pip install --no-cache-dir transcribe-with-whisper
 
-# Runtime env and directories
-ENV UPLOAD_DIR=/app/uploads \
+# Runtime env and directories (new default directory name)
+ENV TRANSCRIPTION_DIR=/app/transcription-files \
     PYTHONUNBUFFERED=1
-RUN mkdir -p ${UPLOAD_DIR}
+RUN mkdir -p ${TRANSCRIPTION_DIR}
 
 # Expose FastAPI port
 EXPOSE 5001

@@ -9,4 +9,5 @@ venv/
 *.egg-info/
 venv
 uploads/
+transcription-files/
 dist/
