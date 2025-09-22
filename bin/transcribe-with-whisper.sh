@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="ghcr.io/literatecomputing/transcribe-with-whisper-web:latest"
+IMAGE="${TWW_WEB_IMAGE:-ghcr.io/literatecomputing/transcribe-with-whisper-web:latest}"
 PORT="${TWW_PORT:-5001}"
-UPLOADS_DIR="${TWW_UPLOADS_DIR:-$(pwd)/uploads}"
+# Prefer new var; fall back for backward compatibility
+TRANSCRIPTION_DIR="${TWW_TRANSCRIPTION_DIR:-${TWW_transcription-files_DIR:-$(pwd)/transcription-files}}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: docker is not installed or not in PATH." >&2
@@ -16,12 +17,12 @@ if [[ -z "${HUGGING_FACE_AUTH_TOKEN:-}" ]]; then
   exit 1
 fi
 
-mkdir -p "${UPLOADS_DIR}"
+mkdir -p "${TRANSCRIPTION_DIR}"
 
 echo "Starting web UI on http://localhost:${PORT}"
 exec docker run --rm \
   -p "${PORT}:5001" \
-  --network=host \
   -e "HUGGING_FACE_AUTH_TOKEN=${HUGGING_FACE_AUTH_TOKEN}" \
-  -v "${UPLOADS_DIR}:/app/uploads" \
+  -e "TRANSCRIPTION_DIR=/app/transcription-files" \
+  -v "${TRANSCRIPTION_DIR}:/app/transcription-files" \
   "${IMAGE}"
