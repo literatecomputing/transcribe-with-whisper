@@ -91,13 +91,13 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 #### Web User Interface
 
 ```
-docker run --rm -p 5001:5001 \
+docker run --rm -p 5001:5000 \
    -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
-   -v "$(pwd)/uploads:/app/uploads" \
+   -v "$(pwd)/transcription-files:/app/transcription-files" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
-After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the uploads folder that is created in the folder/directory where you run the above command.
+After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the transcription-files folder that is created in the folder/directory where you run the above command.
 
 #### Command Line Interface
 
@@ -136,7 +136,7 @@ export HUGGING_FACE_AUTH_TOKEN=hf_xxx
 Environment overrides:
 
 - `TWW_PORT` — web port (default: 5001)
-- `TWW_UPLOADS_DIR` — host uploads directory for the web server (default: `./uploads`)
+- `TWW_transcription-files_DIR` — host transcription-files directory for the web server (default: `./transcription-files`)
 - `TWW_CLI_MOUNT_DIR` — host directory to mount at `/data` for the CLI (default: current directory)
 
 These scripts pull and run the prebuilt multi-arch images from GHCR, so you don’t need to build locally.
@@ -155,7 +155,16 @@ source venv/bin/activate
 pip install transcribe-with-whisper
 ```
 
-You can safely copy/paste the above, but these need for you to pay attention.
+This should work on a Mac:
+
+```
+brew update
+brew install python ffmpeg
+apt update
+apt install -y python3-pip python3.12-venv ffmpeg
+```
+
+You can safely copy/paste the above, but these (same on all platforms) need for you to pay attention and insert your own token and filename.
 
 ```
 export HUGGING_FACE_AUTH_TOKEN=hf_your_access_token
@@ -269,4 +278,4 @@ After the script runs:
 
 While the HTML is great for viewing the data, it's not convenient for other tools you might want to use. There is an `html-to-docx` script available that will convert the HTML into a docx file by default (you can also specify other formats like `html-to-docx file.html file.odt` or `html-to-docx file.html file.pdf`).
 
-Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension).
+Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension). If you want to edit the `.vtt` files, you can re-run the script and it'll create a new HTML file with the contents from the `.vtt` files.
