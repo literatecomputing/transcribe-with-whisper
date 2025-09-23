@@ -160,8 +160,9 @@ This should work on a Mac:
 ```
 brew update
 brew install python ffmpeg
-apt update
-apt install -y python3-pip python3.12-venv ffmpeg
+python3 -m venv venv
+source venv/bin/activate
+pip install transcribe-with-whisper
 ```
 
 You can safely copy/paste the above, but these (same on all platforms) need for you to pay attention and insert your own token and filename.
