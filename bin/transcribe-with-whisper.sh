@@ -3,8 +3,11 @@ set -euo pipefail
 
 IMAGE="${TWW_WEB_IMAGE:-ghcr.io/literatecomputing/transcribe-with-whisper-web:latest}"
 PORT="${TWW_PORT:-5001}"
-# Prefer new var; fall back for backward compatibility
-TRANSCRIPTION_DIR="${TWW_TRANSCRIPTION_DIR:-${TWW_transcription-files_DIR:-$(pwd)/transcription-files}}"
+
+# if TRANSCRIPTION_DIR is set, use it
+# else use $(pwd)/transcription-files as default
+TRANSCRIPTION_DIR="${TRANSCRIPTION_DIR:-$(pwd)/transcription-files}"
+
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Error: docker is not installed or not in PATH." >&2
