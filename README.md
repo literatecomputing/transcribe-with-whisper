@@ -290,6 +290,3 @@ Note that some tools can work with the `.vtt` files that are created in the dire
 - ✅ **Enhanced Timestamps**: Transcripts include speaker names and timestamps for better DOCX export
 
 ## TODO
-
-fix up docker command for windows
-see if cursor can move to current text
