@@ -2,9 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install ffmpeg for audio/video processing
+# Install ffmpeg and pandoc for audio/video processing and DOCX generation
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        pandoc \
+        texlive-latex-recommended \
+        texlive-fonts-recommended \
+        texlive-latex-extra \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the project

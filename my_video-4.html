@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>transcription-files/my_video-4.mp4</title>
+
+    <script>
+      var vidLinks = document.querySelectorAll('.lt a');
+      // for(var i = 0, l = vidLinks.length; ++i) {
+      //     makeVideoLink(vidLinks[i]);
+      // }
+
+      var v = document.getElementsByTagName('video')[0];
+      v.removeAttribute('controls') // '' in Chrome, "true" in FF9 (string)
+      v.controls // true
+      function jumptoTime(time){
+          var v = document.getElementsByTagName('video')[0];
+
+          window.console.log("jumping!!", time);
+          window.console.log("this",this);
+          window.console.log("vid",v);
+          v.currentTime = time;
+      }
+
+      function makeVideoLink(element){
+          // Extract the `t=` hash from the link
+          var timestamp = element.hash.match(/\d+$/,'')[0] * 1000;
+
+          element.addEventListener('click', function videoLinkClick(e){
+              jumpToTime(timestamp);
+
+              return false;
+          },false)
+      }
+    </script>
+    <style>
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            color: #111;
+            padding: 0 0 1em 0;
+	        background-color: #efe7dd;
+        }
+        table {
+             border-spacing: 10px;
+        }
+        th { text-align: left;}
+        .lt {
+          color: inherit;
+          text-decoration: inherit;
+        }
+        .l {
+          color: #050;
+        }
+        .s {
+            display: inline-block;
+        }
+        .c {
+            display: inline-block;
+        }
+        .e {
+            /*background-color: white; Changing background color */
+            border-radius: 20px; /* Making border radius */
+            width: fit-content; /* Making auto-sizable width */
+            height: fit-content; /* Making auto-sizable height */
+            padding: 5px 30px 5px 30px; /* Making space around letters */
+            font-size: 18px; /* Changing font size */
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+            /* white-space: nowrap; */
+        }
+
+        .t {
+            display: inline-block;
+        }
+        #video-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: #efe7dd;
+            z-index: 1000;
+            padding: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #player {
+            display: block;
+            margin: 0 auto;
+        }
+        #content {
+            margin-top: 280px; /* Adjust based on video height + header padding */
+        }
+    </style>
+</head>
+  <body>
+
+    <div id="video-header" class="html-only">
+    <h2 style="text-align: center; margin: 5px 0;">transcription-files/my_video-4</h2>
+    <p style="text-align: center; margin: 5px 0; font-style: italic;">Click on a word to jump to that section of the video</p>
+    <video id="player" style="border:none;" width="575" height="240" preload controls>
+      <source src="transcription-files/my_video-4.mp4" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
+    </video>
+    </div>
+    <div id="content">
+  <div class="e" style="background-color: white">
+
+    <div class="e" style="background-color:lightgray"><span style="color:darkorange">Speaker 1</span><br>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+      <a href="#00:00:01.12" class="lt" onclick="jumptoTime(1)">I'm trying again to capture a video, I would like to capture some video so that I can try</a>
+      <a href="#00:00:06.44" class="lt" onclick="jumptoTime(6)">to then have whisper transcribe it.</a>
+      <a href="#00:00:11.12" class="lt" onclick="jumptoTime(11)">I will talk for a little bit to see if I can get it to have multiple places where I can</a>
+      <a href="#00:00:18.52" class="lt" onclick="jumptoTime(18)">click.</a>
+      <a href="#00:00:19.52" class="lt" onclick="jumptoTime(19)">Okay, thank you.</a>
+    </div>
+  </div> <!-- end of class e and speaker segments -->
+    </div> <!-- end of content -->
+  </body>
+</html>
