@@ -173,6 +173,24 @@ async def upload(file: UploadFile = File(...), speaker: list[str] | None = Form(
     else:
       return PlainTextResponse("Transcription finished but no HTML output found.", status_code=500)
 
+  # Generate DOCX file automatically
+  try:
+    docx_out = html_out.with_suffix('.docx')
+    html_to_docx_script = APP_DIR / "bin" / "html-to-docx.sh"
+    
+    if html_to_docx_script.exists():
+      subprocess.run([
+        str(html_to_docx_script), 
+        str(html_out), 
+        str(docx_out)
+      ], check=True, capture_output=True, text=True)
+      print(f"✅ Generated DOCX: {docx_out.name}")
+    else:
+      print("⚠️ html-to-docx.sh script not found, skipping DOCX generation")
+  except Exception as e:
+    print(f"⚠️ DOCX generation failed: {e}")
+    # Don't fail the whole request if DOCX generation fails
+
   # Redirect to served HTML
   rel_url = f"/files/{html_out.name}"
   return RedirectResponse(url=rel_url, status_code=303)
@@ -210,8 +228,12 @@ async def list_files(_: Request):
         f'<input type="hidden" name="filename" value="{name}">' \
         f'<button type="submit">Re-run</button></form>'
       )
-    # Always allow direct download
-    actions.append(f'<a href="/files/{name}" download>Download</a>')
+    # Highlight DOCX files
+    if p.suffix.lower() == ".docx":
+      actions.append(f'<a href="/files/{name}" download><strong>📄 Download DOCX</strong></a>')
+    else:
+      # Always allow direct download for other files
+      actions.append(f'<a href="/files/{name}" download>Download</a>')
     rows.append(f"<tr><td>{name}</td><td style='text-align:right'>{size}</td><td>{mtime}</td><td>{' | '.join(actions)}</td></tr>")
 
   html = f"""
@@ -276,4 +298,23 @@ async def rerun(filename: str = Form(...)):
   html_out = TRANSCRIPTION_DIR / f"{basename}.html"
   if not html_out.exists():
     return PlainTextResponse("Finished but no HTML output found.", status_code=500)
+
+  # Generate DOCX file automatically
+  try:
+    docx_out = html_out.with_suffix('.docx')
+    html_to_docx_script = APP_DIR / "bin" / "html-to-docx.sh"
+    
+    if html_to_docx_script.exists():
+      subprocess.run([
+        str(html_to_docx_script), 
+        str(html_out), 
+        str(docx_out)
+      ], check=True, capture_output=True, text=True)
+      print(f"✅ Generated DOCX: {docx_out.name}")
+    else:
+      print("⚠️ html-to-docx.sh script not found, skipping DOCX generation")
+  except Exception as e:
+    print(f"⚠️ DOCX generation failed: {e}")
+    # Don't fail the whole request if DOCX generation fails
+
   return RedirectResponse(url=f"/files/{html_out.name}", status_code=303)

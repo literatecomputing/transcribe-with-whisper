@@ -175,22 +175,45 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         .t {
             display: inline-block;
         }
+        #video-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: #efe7dd;
+            z-index: 1000;
+            padding: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
         #player {
-            position: sticky;
-            top: 20px;
-            float: right;
+            display: block;
+            margin: 0 auto;
+        }
+        #content {
+            margin-top: 280px; /* Adjust based on video height + header padding */
+        }
+        .timestamp {
+            color: #666;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .speaker-name {
+            font-weight: bold;
+            margin-right: 8px;
         }
     </style>
 </head>
   <body>
    """ + f"""
-    <div class="html-only">
-    <h2>{video_title}</h2>
-    <i>Click on a word to jump to that section of the video<br></i>
-  <video id="player" style="border:none;" width="575" height="240" preload controls>
-    <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
+    <div id="video-header" class="html-only">
+    <h2 style="text-align: center; margin: 5px 0;">{video_title}</h2>
+    <p style="text-align: center; margin: 5px 0; font-style: italic;">Click on a word to jump to that section of the video</p>
+    <video id="player" style="border:none;" width="575" height="240" preload controls>
+      <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
     </video>
     </div>
+    <div id="content">
   <div class="e" style="background-color: white">
   """
     html.append(preS)
@@ -205,9 +228,12 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         for c in captions:
             start_sec = (shift + c[0]) / 1000
             startStr = f"{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{start_sec%60:05.2f}"
-            html.append(f'      <a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a>')
+            # Include speaker name and timestamp for DOCX export
+            html.append(f'      <span class="timestamp">[{startStr}] </span>')
+            html.append(f'      <span class="speaker-name">{spkr_name}: </span>')
+            html.append(f'      <a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a><br>')
         html.append("    </div>")
-    html.append("  </div> <!-- end of class e and speaker segments -->\n  </body>\n</html>")
+    html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->\n  </body>\n</html>")
     with open(outputHtml, "w", encoding="utf-8") as f:
         f.write("\n".join(html))
     
