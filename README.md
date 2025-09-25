@@ -251,7 +251,7 @@ echo 'export HUGGING_FACE_AUTH_TOKEN=your_token_here' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-If you use Linux, you use `bash` instead of `zsh` , so do this instead:
+If you use Linux or WSL, you use `bash` instead of `zsh` , so do this instead:
 
 ```
 echo 'export HUGGING_FACE_AUTH_TOKEN=your_token_here' >> ~/.bashrc
