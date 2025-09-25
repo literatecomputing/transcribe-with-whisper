@@ -104,78 +104,46 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     preS = f"""<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{inputfile}</title>
-    """ + """
-    <script>
-      var vidLinks = document.querySelectorAll('.lt a');
-      // for(var i = 0, l = vidLinks.length; ++i) {
-      //     makeVideoLink(vidLinks[i]);
-      // }
-
-      var v = document.getElementsByTagName('video')[0];
-      v.removeAttribute('controls') // '' in Chrome, "true" in FF9 (string)
-      v.controls // true
-      function jumptoTime(time){
-          var v = document.getElementsByTagName('video')[0];
-
-          window.console.log("jumping!!", time);
-          window.console.log("this",this);
-          window.console.log("vid",v);
-          v.currentTime = time;
-      }
-
-      function makeVideoLink(element){
-          // Extract the `t=` hash from the link
-          var timestamp = element.hash.match(/\d+$/,'')[0] * 1000;
-
-          element.addEventListener('click', function videoLinkClick(e){
-              jumpToTime(timestamp);
-
-              return false;
-          },false)
-      }
-    </script>
     <style>
-        body {
+        body {{
             font-family: sans-serif;
             font-size: 18px;
             color: #111;
             padding: 0 0 1em 0;
 	        background-color: #efe7dd;
-        }
-        table {
+        }}
+        table {{
              border-spacing: 10px;
-        }
-        th { text-align: left;}
-        .lt {
+        }}
+        th {{ text-align: left;}}
+        .lt {{
           color: inherit;
           text-decoration: inherit;
-        }
-        .l {
+        }}
+        .l {{
           color: #050;
-        }
-        .s {
+        }}
+        .s {{
             display: inline-block;
-        }
-        .c {
+        }}
+        .c {{
             display: inline-block;
-        }
-        .e {
-            /*background-color: white; Changing background color */
-            border-radius: 20px; /* Making border radius */
-            width: fit-content; /* Making auto-sizable width */
-            height: fit-content; /* Making auto-sizable height */
-            padding: 5px 30px 5px 30px; /* Making space around letters */
-            font-size: 18px; /* Changing font size */
+        }}
+        .e {{
+            border-radius: 20px;
+            width: fit-content;
+            height: fit-content;
+            padding: 5px 30px 5px 30px;
+            font-size: 18px;
             display: flex;
             flex-direction: column;
             margin-bottom: 10px;
-            /* white-space: nowrap; */
-        }
+        }}
 
-        .t {
+        .t {{
             display: inline-block;
-        }
-        #video-header {
+        }}
+        #video-header {{
             position: fixed;
             top: 0;
             left: 0;
@@ -185,23 +153,23 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             z-index: 1000;
             padding: 10px 0;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        #player {
+        }}
+        #player {{
             display: block;
             margin: 0 auto;
-        }
-        #content {
-            margin-top: 280px; /* Adjust based on video height + header padding */
-        }
-        .timestamp {
+        }}
+        #content {{
+            margin-top: 280px;
+        }}
+        .timestamp {{
             color: #666;
             font-size: 14px;
             font-weight: bold;
-        }
-        .speaker-name {
+        }}
+        .speaker-name {{
             font-weight: bold;
             margin-right: 8px;
-        }
+        }}
     </style>
 </head>
   <body>
@@ -233,7 +201,114 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             html.append(f'      <span class="speaker-name">{spkr_name}: </span>')
             html.append(f'      <a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a><br>')
         html.append("    </div>")
-    html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->\n  </body>\n</html>")
+    html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->")
+    
+    # Add JavaScript at the end of the body for proper DOM loading
+    javascript_code = """
+    <script>
+      console.log('Loading video highlight script...');
+      
+      function jumptoTime(time){
+          var v = document.getElementsByTagName('video')[0];
+          console.log("jumping to time:", time);
+          if (v) {
+              v.currentTime = time;
+          }
+      }
+
+      // Track current segment highlighting
+      var currentHighlighted = null;
+
+      function highlightCurrentSegment() {
+          var v = document.getElementsByTagName('video')[0];
+          if (!v) {
+              console.log('Video element not found');
+              return;
+          }
+          
+          var currentTime = v.currentTime;
+          console.log('Current video time:', currentTime);
+          
+          // Find all clickable transcript segments
+          var segments = document.querySelectorAll('a.lt[onclick]');
+          console.log('Found segments:', segments.length);
+          
+          var targetSegment = null;
+          
+          // Find the segment that should be highlighted based on current video time
+          for (var i = 0; i < segments.length; i++) {
+              var onclick = segments[i].getAttribute('onclick');
+              if (!onclick) continue;
+              
+              var match = onclick.match(/jumptoTime\\((\\d+)\\)/);
+              if (!match) continue;
+              
+              var segmentTime = parseInt(match[1]);
+              
+              // Check if this is the current or most recent segment
+              if (segmentTime <= currentTime) {
+                  targetSegment = segments[i];
+              } else {
+                  break; // segments are in chronological order
+              }
+          }
+          
+          // Only update highlighting if we're switching to a different segment
+          if (targetSegment !== currentHighlighted) {
+              // Remove previous highlighting
+              if (currentHighlighted) {
+                  currentHighlighted.style.backgroundColor = '';
+                  currentHighlighted.style.fontWeight = '';
+                  console.log('Removed previous highlight');
+              }
+              
+              // Highlight new segment
+              if (targetSegment) {
+                  targetSegment.style.backgroundColor = '#ffeb3b';
+                  targetSegment.style.fontWeight = 'bold';
+                  currentHighlighted = targetSegment;
+                  console.log('Highlighted new segment:', targetSegment.textContent.substring(0, 50) + '...');
+                  
+                  // Scroll to keep current segment visible
+                  targetSegment.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'center'
+                  });
+              }
+          }
+      }
+
+      // Initialize when DOM is ready
+      function initializeVideoTracking() {
+          console.log('Initializing video tracking...');
+          var v = document.getElementsByTagName('video')[0];
+          if (v) {
+              console.log('Video found, adding event listeners');
+              // Update highlighting as video plays
+              v.addEventListener('timeupdate', highlightCurrentSegment);
+              
+              // Also update when user seeks
+              v.addEventListener('seeked', highlightCurrentSegment);
+              
+              // Initial highlight check
+              setTimeout(highlightCurrentSegment, 100);
+          } else {
+              console.log('Video not found, retrying in 500ms');
+              setTimeout(initializeVideoTracking, 500);
+          }
+      }
+      
+      // Start initialization when DOM loads
+      if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initializeVideoTracking);
+      } else {
+          initializeVideoTracking();
+      }
+    </script>
+  </body>
+</html>"""
+    
+    html.append(javascript_code)
     with open(outputHtml, "w", encoding="utf-8") as f:
         f.write("\n".join(html))
     
