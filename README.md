@@ -2,6 +2,8 @@
 
 This set of tools is for people who need to transcribe video (or audio) files, but must protect the privacy of the people in the data set. This uses free AI tools and models to transcribe video and audio files to an HTML file that will show the transcript in your web browser and let you click on a word to be taken to that section of the original data file. A script to convert the HTML to docx is also included.
 
+The `docx` files created include the speaker and timestamp so that it should be compatible with MAXQDA's [timestamps](https://www.maxqda.com/help-mx24/import/transcripts).
+
 It works on macOS (Intel & Apple Silicon), Linux, and Windows (not well tested).
 
 I've tried very hard to make it work for people whose computer expertise includes little more than being able to install computer programs from a web page and click on stuff in a web browser.
@@ -9,6 +11,8 @@ I've tried very hard to make it work for people whose computer expertise include
 ---
 
 ## What this does
+
+TL;DR: takes a video file, makes an HTML page that tracks the transcription with the playing video and makes video jump to text that you click. A `.docx` file with timestamps, which should be suitable for use with packages like MAXQDA is also created.
 
 - Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It should also work on audio-only files, though it may need some fairly simple modifications to do that.
 
@@ -28,8 +32,10 @@ I can't find a good source what languages are supported, but something that seem
 
 ## What Is Required? An Overview
 
+tl;dr:
+
 - A Hugging Face Auth Token
-- Python or Docker
+- [Python](https://www.python.org/) or [Docker](https://docs.docker.com/desktop/)
 
 However you use this, you need to have a Hugging Face Auth Token to download the AI model ([What is a model?](https://huggingface.co/docs/hub/en/models)) that does diarization (distinguishing multiple speakers in the transcript). Details below.
 
@@ -39,7 +45,7 @@ If you're not comfortable with Python, you can install [Docker Desktop](https://
 
 If you don't know which of those you are more comfortable with, the answer is probably Docker. If you don't know what [`brew`](https://brew.sh/) is, you probably want Docker.
 
-### Hugging Face Auth Token is required
+### Hugging Face Auth Token is required (You have to read this!)
 
 A couple of AI Models available at [Hugging Face](https://huggingface.co/) are required to make this work. Hugging Face requires you to create an account and request permission to use these models (permission is granted immediately). An Auth Token (a fancy name for a combined username and password, sort of) is required for this program to download those models. Here's how to get the HUGGING_FACE_AUTH_TOKEN.
 
@@ -49,9 +55,9 @@ A couple of AI Models available at [Hugging Face](https://huggingface.co/) are r
 
 2. Request access to each of the required models—click "Use this model" for pyannote.audio and accept their terms.
 
-On each model page below, click “Use this model” and select "pyannote.audio". Access is typically approved instantly for free use. After you have accepted it, you should see "**Gated Model** You have been granted access to this model". You can also check which models you have access to at https://huggingface.co/settings/gated-repos.
+On each model page linked below, click “Use this model” and select "pyannote.audio" (pyannote.audio is a Python library). After you have accepted their terms, you should see "**Gated Model** You have been granted access to this model". You can also check which models you have access to at https://huggingface.co/settings/gated-repos.
 
-- Note: Model pages may mention "pyannoteAI" as a production option. This project uses the open-source models; pyannoteAI is a separate commercial alternative.
+#### Request Access for these Models!
 
 - Required: pyannote/speaker-diarization-3.1 → https://huggingface.co/pyannote/speaker-diarization-3.1
 - Required: pyannote/segmentation-3.0 → https://huggingface.co/pyannote/segmentation-3.0
@@ -66,8 +72,28 @@ On each model page below, click “Use this model” and select "pyannote.audio"
 4. Set the token as an environment variable
 
 - Linux/Windows WSL (bash):
-  `export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here`
-- For Mac (which uses zsh by default) use this to have it automatically added to your environment `echo "export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here" >> ~/.zshrc`
+
+```bash
+export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here
+```
+
+- For Mac (which uses zsh by default) use this to have it automatically added to your environment
+
+```bash
+echo "export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here" >> ~/.zshrc
+```
+
+- Windows (Command Prompt/PowerShell):
+
+```cmd
+set HUGGING_FACE_AUTH_TOKEN="hf_your_token_here"
+```
+
+```cmd
+setx HUGGING_FACE_AUTH_TOKEN "%HUGGING_FACE_AUTH_TOKEN%"
+```
+
+_Note: The `set` command sets the value for the current session, the `setx` command copies that value to make it permanent for future sessions._
 
 Notes
 
@@ -92,18 +118,37 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 
 #### Web User Interface
 
-```
+**Linux/Mac (bash/zsh):**
+
+```bash
 docker run --rm -p 5001:5001 \
    -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
    -v "$(pwd)/transcription-files:/app/transcription-files" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
+**Windows (PowerShell):**
+
+If you can't figure out how to get Windows Terminal to run `bash`, this should work in PowerShell.
+
+```powershell
+docker run --rm -p 5001:5001 `
+   -e HUGGING_FACE_AUTH_TOKEN=$env:HUGGING_FACE_AUTH_TOKEN `
+   -v "${PWD}/transcription-files:/app/transcription-files" `
+   ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
+```
+
+This command will get a newer Docker image if one is available (should work in all shells).
+
+```
+docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
+```
+
 After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the transcription-files folder that is created in the folder/directory where you run the above command. Both HTML and DOCX files are automatically generated for each transcription.
 
 #### Command Line Interface
 
-```
+```bash
 docker run --rm -it \
    -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
    -v "$(pwd):/data" \
@@ -119,6 +164,7 @@ These are some shortcuts that will run the commands above. The above are more fl
 
 - `bin/transcribe-with-whisper.sh` — runs the Web UI
 - `bin/transcribe-with-whisper-cli.sh` — runs the CLI
+- `bin/html-to-docx.sh` -- converts the html file into a docx
 
 Usage:
 
@@ -145,11 +191,11 @@ These scripts pull and run the prebuilt multi-arch images from GHCR, so you don�
 
 ## 🛠️ Running without Docker
 
-If you know a bit about Python and command lines, you might prefer to use the Python version and skip fooling with Docker.
+If you know a bit about Python and command lines, you might prefer to use the Python version and skip the overhead of Docker (and see that dependencies are handled yourself!)
 
 On a fresh Ubuntu 24.04 installation, this works:
 
-```
+```bash
 apt update
 apt install -y python3-pip python3.12-venv ffmpeg
 python3 -m venv venv
@@ -159,7 +205,7 @@ pip install transcribe-with-whisper
 
 This should work on a Mac:
 
-```
+```bash
 brew update
 brew install python ffmpeg
 python3 -m venv venv
@@ -169,7 +215,7 @@ pip install transcribe-with-whisper
 
 You can safely copy/paste the above, but these (same on all platforms) need for you to pay attention and insert your own token and filename.
 
-```
+```bash
 export HUGGING_FACE_AUTH_TOKEN=hf_your_access_token
 transcribe-with-whisper your-video.mp4
 ```
@@ -234,7 +280,7 @@ sudo apt install ffmpeg python3 python3-pip -y
 
 #### **Windows**
 
-I had some instructions written by an AI, but they looked pretty bogus, so I deleted them. I think you'd want to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), and then follow the above Linux instructions, but since WSL didn't exist in Windows 95, I don't know much about it.
+I think that if you install WSL the Ubuntu instructions should work without changes.
 
 ---
 
@@ -281,7 +327,7 @@ After the script runs:
 
 While the HTML is great for viewing the data, it's not convenient for other tools you might want to use. There is an `html-to-docx` script available that will convert the HTML into a docx file by default (you can also specify other formats like `html-to-docx file.html file.odt` or `html-to-docx file.html file.pdf`).
 
-Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension). If you want to edit the `.vtt` files, you can re-run the script and it'll create a new HTML file with the contents from the `.vtt` files.
+Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension). If you want to edit the `.vtt` files, you can re-run the script and it'll create a new HTML file with the contents from the `.vtt` files. The `.vtt` files, however, do not include information about the speaker, which makes them less desirable.
 
 ## Recent Updates
 
