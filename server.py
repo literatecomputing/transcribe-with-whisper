@@ -2,6 +2,9 @@ import os
 import sys
 import shutil
 import subprocess
+import threading
+import time
+import json
 from pathlib import Path
 from datetime import datetime
 from typing import Iterable
@@ -24,6 +27,10 @@ TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Transcribe with Whisper (Web)")
 app.mount("/files", StaticFiles(directory=str(TRANSCRIPTION_DIR)), name="files")
+
+# Simple in-memory job tracking
+jobs = {}  # job_id -> {"status": "running|completed|error", "progress": 0-100, "message": "...", "result": "..."}
+job_counter = 0
 
 
 INDEX_HTML = """
@@ -76,6 +83,93 @@ async def index(_: Request):
     return HTMLResponse(INDEX_HTML)
 
 
+@app.get("/progress/{job_id}", response_class=HTMLResponse)
+async def progress_page(job_id: str):
+    if job_id not in jobs:
+        return PlainTextResponse("Job not found", status_code=404)
+    
+    job = jobs[job_id]
+    return HTMLResponse(f"""
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Transcription Progress</title>
+    <style>
+      body {{ font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }}
+      .card {{ background: #fff; border-radius: 8px; padding: 1rem 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }}
+      .progress-bar {{ width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; margin: 1rem 0; }}
+      .progress-fill {{ height: 100%; background: #0d6efd; transition: width 0.5s ease; }}
+      .spinner {{ display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0d6efd; border-radius: 50%; animation: spin 2s linear infinite; }}
+      @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+      .status {{ margin: 1rem 0; }}
+      .error {{ color: #dc3545; }}
+      .success {{ color: #28a745; }}
+    </style>
+    <script>
+      function updateProgress() {{
+        fetch('/api/job/{job_id}')
+          .then(response => response.json())
+          .then(data => {{
+            document.getElementById('progress-fill').style.width = data.progress + '%';
+            document.getElementById('progress-text').innerText = data.progress + '%';
+            document.getElementById('status-message').innerText = data.message;
+            
+            if (data.status === 'completed' && data.result) {{
+              // Hide spinner and update status
+              document.querySelector('.spinner').style.display = 'none';
+              document.getElementById('status-container').innerHTML = 
+                '<div class="success">✅ Transcription completed! <a href="' + data.result + '">View result</a></div>' +
+                '<p><a href="/list">View all files</a> | <a href="/">Upload another file</a></p>';
+            }} else if (data.status === 'error') {{
+              // Hide spinner and show error
+              document.querySelector('.spinner').style.display = 'none';
+              document.getElementById('status-container').innerHTML = 
+                '<div class="error">❌ Error: ' + data.message + '</div>' +
+                '<p><a href="/">Try again</a></p>';
+            }} else {{
+              setTimeout(updateProgress, 2000); // Check again in 2 seconds
+            }}
+          }})
+          .catch(error => {{
+            console.error('Error:', error);
+            setTimeout(updateProgress, 5000);
+          }});
+      }}
+      
+      // Start checking progress when page loads
+      window.onload = function() {{
+        updateProgress();
+      }};
+    </script>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Transcribing: {job['filename']}</h1>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill" style="width: {job['progress']}%"></div>
+      </div>
+      <div class="status">
+        <span class="spinner"></span> 
+        <span id="progress-text">{job['progress']}%</span> - 
+        <span id="status-message">{job['message']}</span>
+      </div>
+      <div id="status-container"></div>
+      <p><small>This page will automatically update. Please don't close your browser.</small></p>
+    </div>
+  </body>
+</html>
+""")
+
+
+@app.get("/api/job/{job_id}")
+async def get_job_status(job_id: str):
+    if job_id not in jobs:
+        return {"error": "Job not found"}, 404
+    return jobs[job_id]
+
+
 def _build_cli_cmd(filename: str, speakers: list[str] | None = None) -> list[str]:
   # Use the Python module entrypoint to avoid reliance on console_scripts in PATH
   cmd: list[str] = [sys.executable, "-m", "transcribe_with_whisper.main", filename]
@@ -125,8 +219,86 @@ def startup_check_token():
   _validate_hf_token_or_die()
 
 
+def _run_transcription_job(job_id: str, filename: str, speakers: list[str] | None):
+  """Run transcription in background thread"""
+  global jobs
+  
+  try:
+    jobs[job_id]["status"] = "running"
+    jobs[job_id]["message"] = "Starting transcription..."
+    jobs[job_id]["progress"] = 5
+    
+    # Build CLI command
+    cmd = _build_cli_cmd(filename, speakers or None)
+    
+    jobs[job_id]["message"] = "Processing audio and running AI models..."
+    jobs[job_id]["progress"] = 20
+    
+    # Run the CLI
+    proc = subprocess.run(
+      cmd,
+      cwd=str(TRANSCRIPTION_DIR),
+      env=_subprocess_env_with_repo_path(),
+      capture_output=True,
+      text=True,
+      check=False,
+    )
+    
+    jobs[job_id]["progress"] = 80
+    
+    if proc.returncode != 0:
+      jobs[job_id]["status"] = "error"
+      jobs[job_id]["message"] = f"CLI failed with code {proc.returncode}"
+      jobs[job_id]["error"] = f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+      return
+
+    # Find output HTML
+    basename = Path(filename).stem
+    html_out = TRANSCRIPTION_DIR / f"{basename}.html"
+    if not html_out.exists():
+      candidates = sorted(TRANSCRIPTION_DIR.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True)
+      if candidates:
+        html_out = candidates[0]
+      else:
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["message"] = "No HTML output found"
+        return
+
+    jobs[job_id]["message"] = "Generating DOCX file..."
+    jobs[job_id]["progress"] = 90
+
+    # Generate DOCX file automatically
+    try:
+      docx_out = html_out.with_suffix('.docx')
+      html_to_docx_script = APP_DIR / "bin" / "html-to-docx.sh"
+      
+      if html_to_docx_script.exists():
+        subprocess.run([
+          str(html_to_docx_script), 
+          str(html_out), 
+          str(docx_out)
+        ], check=True, capture_output=True, text=True)
+        print(f"✅ Generated DOCX: {docx_out.name}")
+      else:
+        print("⚠️ html-to-docx.sh script not found, skipping DOCX generation")
+    except Exception as e:
+      print(f"⚠️ DOCX generation failed: {e}")
+      # Don't fail the job if DOCX generation fails
+
+    jobs[job_id]["status"] = "completed"
+    jobs[job_id]["progress"] = 100
+    jobs[job_id]["message"] = "Transcription completed!"
+    jobs[job_id]["result"] = f"/files/{html_out.name}"
+    
+  except Exception as e:
+    jobs[job_id]["status"] = "error"
+    jobs[job_id]["message"] = f"Failed to run transcription: {e}"
+
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...), speaker: list[str] | None = Form(default=None)):
+  global job_counter, jobs
+  
   # Ensure HF token is provided
   if not os.getenv("HUGGING_FACE_AUTH_TOKEN"):
       return PlainTextResponse(
@@ -138,62 +310,25 @@ async def upload(file: UploadFile = File(...), speaker: list[str] | None = Form(
   with dest_path.open("wb") as out:
     shutil.copyfileobj(file.file, out)
 
-  # Build CLI command; pass speaker names if provided
-  # Build command using Python module to avoid PATH issues
+  # Create job and start background processing
+  job_counter += 1
+  job_id = str(job_counter)
   speakers = [s.strip() for s in (speaker or []) if s and s.strip()]
-  cmd = _build_cli_cmd(file.filename, speakers or None)
-
-  # Run the CLI synchronously; the CLI writes ../<basename>.html relative to its work dir
-  try:
-    proc = subprocess.run(
-      cmd,
-      cwd=str(TRANSCRIPTION_DIR),
-      env=_subprocess_env_with_repo_path(),
-      capture_output=True,
-      text=True,
-      check=False,
-    )
-  except Exception as e:
-    return PlainTextResponse(f"Failed to run CLI: {e}", status_code=500)
-
-  if proc.returncode != 0:
-    return PlainTextResponse(
-      f"CLI failed with code {proc.returncode}\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}",
-      status_code=500,
-    )
-
-  # Determine output HTML path; the CLI writes <basename>.html in the working directory
-  basename = Path(file.filename).stem
-  html_out = TRANSCRIPTION_DIR / f"{basename}.html"
-  if not html_out.exists():
-    # Fallback: scan for any html created recently
-    candidates = sorted(TRANSCRIPTION_DIR.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if candidates:
-      html_out = candidates[0]
-    else:
-      return PlainTextResponse("Transcription finished but no HTML output found.", status_code=500)
-
-  # Generate DOCX file automatically
-  try:
-    docx_out = html_out.with_suffix('.docx')
-    html_to_docx_script = APP_DIR / "bin" / "html-to-docx.sh"
-    
-    if html_to_docx_script.exists():
-      subprocess.run([
-        str(html_to_docx_script), 
-        str(html_out), 
-        str(docx_out)
-      ], check=True, capture_output=True, text=True)
-      print(f"✅ Generated DOCX: {docx_out.name}")
-    else:
-      print("⚠️ html-to-docx.sh script not found, skipping DOCX generation")
-  except Exception as e:
-    print(f"⚠️ DOCX generation failed: {e}")
-    # Don't fail the whole request if DOCX generation fails
-
-  # Redirect to served HTML
-  rel_url = f"/files/{html_out.name}"
-  return RedirectResponse(url=rel_url, status_code=303)
+  
+  jobs[job_id] = {
+    "status": "starting",
+    "progress": 0,
+    "message": "Preparing transcription...",
+    "filename": file.filename
+  }
+  
+  # Start background thread
+  thread = threading.Thread(target=_run_transcription_job, args=(job_id, file.filename, speakers))
+  thread.daemon = True
+  thread.start()
+  
+  # Redirect to progress page
+  return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
 
 
 def _human_size(n: int) -> str:
@@ -267,6 +402,8 @@ async def list_files(_: Request):
 
 @app.post("/rerun")
 async def rerun(filename: str = Form(...)):
+  global job_counter, jobs
+  
   # Validate target file is in the directory
   target = (TRANSCRIPTION_DIR / filename).resolve()
   if not target.exists() or target.parent != TRANSCRIPTION_DIR.resolve():
@@ -275,46 +412,21 @@ async def rerun(filename: str = Form(...)):
   if target.suffix.lower() not in {".mp4", ".m4a", ".wav", ".mp3", ".mkv", ".mov"}:
     return PlainTextResponse("Re-run is only supported for media files.", status_code=400)
 
-  cmd = _build_cli_cmd(target.name)
-  try:
-    proc = subprocess.run(
-      cmd,
-      cwd=str(TRANSCRIPTION_DIR),
-      env=_subprocess_env_with_repo_path(),
-      capture_output=True,
-      text=True,
-      check=False,
-    )
-  except Exception as e:
-    return PlainTextResponse(f"Failed to run CLI: {e}", status_code=500)
-
-  if proc.returncode != 0:
-    return PlainTextResponse(
-      f"CLI failed with code {proc.returncode}\nSTDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}",
-      status_code=500,
-    )
-
-  basename = target.stem
-  html_out = TRANSCRIPTION_DIR / f"{basename}.html"
-  if not html_out.exists():
-    return PlainTextResponse("Finished but no HTML output found.", status_code=500)
-
-  # Generate DOCX file automatically
-  try:
-    docx_out = html_out.with_suffix('.docx')
-    html_to_docx_script = APP_DIR / "bin" / "html-to-docx.sh"
-    
-    if html_to_docx_script.exists():
-      subprocess.run([
-        str(html_to_docx_script), 
-        str(html_out), 
-        str(docx_out)
-      ], check=True, capture_output=True, text=True)
-      print(f"✅ Generated DOCX: {docx_out.name}")
-    else:
-      print("⚠️ html-to-docx.sh script not found, skipping DOCX generation")
-  except Exception as e:
-    print(f"⚠️ DOCX generation failed: {e}")
-    # Don't fail the whole request if DOCX generation fails
-
-  return RedirectResponse(url=f"/files/{html_out.name}", status_code=303)
+  # Create job and start background processing
+  job_counter += 1
+  job_id = str(job_counter)
+  
+  jobs[job_id] = {
+    "status": "starting",
+    "progress": 0,
+    "message": "Preparing transcription...",
+    "filename": filename
+  }
+  
+  # Start background thread
+  thread = threading.Thread(target=_run_transcription_job, args=(job_id, target.name, None))
+  thread.daemon = True
+  thread.start()
+  
+  # Redirect to progress page
+  return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
