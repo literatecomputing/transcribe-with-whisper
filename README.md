@@ -50,11 +50,11 @@ A couple of AI Models available at [Hugging Face](https://huggingface.co/) are r
 2. Request access to each of the required models—click "Use this model" for pyannote.audio and accept their terms.
 
 On each model page below, click “Use this model” and select "pyannote.audio". Access is typically approved instantly for free use. After you have accepted it, you should see "**Gated Model** You have been granted access to this model". You can also check which models you have access to at https://huggingface.co/settings/gated-repos.
-  - Note: Model pages may mention "pyannoteAI" as a production option. This project uses the open-source models; pyannoteAI is a separate commercial alternative.
+
+- Note: Model pages may mention "pyannoteAI" as a production option. This project uses the open-source models; pyannoteAI is a separate commercial alternative.
 
 - Required: pyannote/speaker-diarization-3.1 → https://huggingface.co/pyannote/speaker-diarization-3.1
 - Required: pyannote/segmentation-3.0 → https://huggingface.co/pyannote/segmentation-3.0
-
 
 3. Create a read-access token
 
@@ -68,7 +68,7 @@ On each model page below, click “Use this model” and select "pyannote.audio"
 - Linux/Windows WSL (bash):
   `export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here`
 - For Mac (which uses zsh by default) use this to have it automatically added to your environment `echo "export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here" >> ~/.zshrc`
- 
+
 Notes
 
 - Only the pyannote diarization pipeline and segmentation requires the token; Faster-Whisper itself does not use Hugging Face auth.
@@ -79,7 +79,6 @@ Notes
 If you don't have Docker installed. You should head over to the [Docker Desktop](https://docs.docker.com/desktop/) page and find the installation instructions. Maybe you don't care what Docker is and just want the download instructions for [Mac](https://docs.docker.com/desktop/setup/install/mac-install/), [Windows](https://docs.docker.com/desktop/setup/install/windows-install/), or [Linux](https://docs.docker.com/desktop/setup/install/linux/.)
 
 If you use Windows, Docker requires you to install WSL ([https://learn.microsoft.com/en-us/windows/wsl/about](Windows Subsystem for Linux)). Instructions below assume that you are running `bash` as your shell; apparently, if you install [Windows Terminal](https://apps.microsoft.com/detail/9n0dx20hk701?wtExtndSource=cfm_UASTLP_myATT_LFM_MicrosoftStore&hl=en-US&gl=US) then, well, I don't know.
-
 
 Remember above when it said that you needed to do this?
 
@@ -283,7 +282,6 @@ After the script runs:
 While the HTML is great for viewing the data, it's not convenient for other tools you might want to use. There is an `html-to-docx` script available that will convert the HTML into a docx file by default (you can also specify other formats like `html-to-docx file.html file.odt` or `html-to-docx file.html file.pdf`).
 
 Note that some tools can work with the `.vtt` files that are created in the directory created with the same name as the original file (without the filename extension). If you want to edit the `.vtt` files, you can re-run the script and it'll create a new HTML file with the contents from the `.vtt` files.
-
 
 ## Recent Updates
 
