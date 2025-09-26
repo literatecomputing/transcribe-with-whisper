@@ -159,7 +159,7 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             margin: 0 auto;
         }}
         #content {{
-            margin-top: 280px;
+            margin-top: 380px;
         }}
         .timestamp {{
             color: #666;
@@ -169,6 +169,78 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         .speaker-name {{
             font-weight: bold;
             margin-right: 8px;
+        }}
+        
+        /* Edit mode styles */
+        .edit-controls {{
+            text-align: center;
+            margin: 10px 0;
+        }}
+        .edit-btn {{
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-size: 14px;
+        }}
+        .edit-btn:hover {{
+            background: #0056b3;
+        }}
+        .edit-btn.active {{
+            background: #28a745;
+        }}
+        .edit-btn:disabled {{
+            background: #6c757d;
+            cursor: not-allowed;
+        }}
+        .save-status {{
+            display: inline-block;
+            margin-left: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }}
+        .save-success {{
+            background: #d4edda;
+            color: #155724;
+        }}
+        .save-error {{
+            background: #f8d7da;
+            color: #721c24;
+        }}
+        
+        /* Editable transcript styles */
+        .transcript-segment {{
+            position: relative;
+        }}
+        .transcript-segment.editable {{
+            border: 1px dashed #007bff;
+            border-radius: 4px;
+            margin: 2px 0;
+        }}
+        .transcript-segment.editable:hover {{
+            background-color: #f8f9fa;
+        }}
+        .transcript-segment.editing {{
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+        }}
+        .transcript-text {{
+            cursor: text;
+        }}
+        .transcript-segment.editable .transcript-text {{
+            min-height: 1.2em;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }}
+        .transcript-text[contenteditable="true"] {{
+            outline: none;
+            background: #fffbf0;
+            border: 1px solid #ffc107;
+            border-radius: 2px;
         }}
     </style>
 </head>
@@ -180,6 +252,13 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     <video id="player" style="border:none;" width="575" height="240" preload controls>
       <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
     </video>
+    
+    <div class="edit-controls">
+      <button id="edit-mode-btn" class="edit-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
+      <button id="save-btn" class="edit-btn" onclick="saveChanges()" style="display: none;">💾 Save Changes</button>
+      <button id="cancel-btn" class="edit-btn" onclick="cancelEdits()" style="display: none;">❌ Cancel</button>
+      <span id="save-status" class="save-status"></span>
+    </div>
     </div>
     <div id="content">
   <div class="e" style="background-color: white">
@@ -188,18 +267,23 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     def_boxclr, def_spkrclr = "white", "orange"
 
     for idx, g in enumerate(groups):
-        shift = max(millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0]) - spacermilli, 0)
+        # Use the actual start time of the diarization segment, not offset by spacermilli
+        shift = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
         speaker = g[0].split()[-1]
         spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
         html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
         captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
         for c in captions:
-            start_sec = (shift + c[0]) / 1000
+            start_sec = c[0] / 1000  # Use VTT timestamps directly - they're already correct
+            end_sec = c[1] / 1000
             startStr = f"{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{start_sec%60:05.2f}"
-            # Include speaker name and timestamp for DOCX export
-            html.append(f'      <span class="timestamp">[{startStr}] </span>')
-            html.append(f'      <span class="speaker-name">{spkr_name}: </span>')
-            html.append(f'      <a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a><br>')
+            endStr = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{end_sec%60:05.2f}"
+            # Include speaker name and timestamp for DOCX export, wrapped for editing
+            html.append(f'      <div class="transcript-segment" data-start="{start_sec}" data-end="{end_sec}" data-speaker="{spkr_name}">')
+            html.append(f'        <span class="timestamp">[{startStr}] </span>')
+            html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
+            html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a></span>')
+            html.append(f'      </div>')
         html.append("    </div>")
     html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->")
     
@@ -295,6 +379,133 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
           } else {
               console.log('Video not found, retrying in 500ms');
               setTimeout(initializeVideoTracking, 500);
+          }
+      }
+      
+      // Edit mode functionality
+      let editMode = false;
+      let originalContent = {};
+      
+      function toggleEditMode() {
+          editMode = !editMode;
+          const editButton = document.querySelector('#edit-mode-btn');
+          const saveButton = document.querySelector('#save-btn');
+          const cancelButton = document.querySelector('#cancel-btn');
+          const body = document.body;
+          const segments = document.querySelectorAll('.transcript-segment');
+          
+          if (editMode) {
+              // Enter edit mode
+              body.classList.add('editing');
+              editButton.textContent = '📝 Editing...';
+              saveButton.style.display = 'inline-block';
+              cancelButton.style.display = 'inline-block';
+              
+              // Store original content and make segments editable
+              segments.forEach(segment => {
+                  // Store only the transcript text content, not timestamp/speaker
+                  const transcriptTextSpan = segment.querySelector('.transcript-text');
+                  originalContent[segment.dataset.start] = transcriptTextSpan ? transcriptTextSpan.textContent : '';
+                  
+                  // Make only the transcript-text span editable, not the whole segment
+                  const textSpan = segment.querySelector('.transcript-text');
+                  if (textSpan) {
+                      textSpan.contentEditable = true;
+                  }
+                  segment.classList.add('editable');
+              });
+          } else {
+              // Exit edit mode
+              body.classList.remove('editing');
+              editButton.textContent = '📝 Edit Mode';
+              saveButton.style.display = 'none';
+              cancelButton.style.display = 'none';
+              
+              // Make segments non-editable
+              segments.forEach(segment => {
+                  const textSpan = segment.querySelector('.transcript-text');
+                  if (textSpan) {
+                      textSpan.contentEditable = false;
+                  }
+                  segment.classList.remove('editable');
+              });
+              
+              originalContent = {};
+          }
+      }
+      
+      function saveChanges() {
+          const segments = document.querySelectorAll('.transcript-segment');
+          const changes = [];
+          
+          segments.forEach(segment => {
+              const start = segment.dataset.start;
+              const end = segment.dataset.end;
+              const speaker = segment.dataset.speaker || '';
+              
+              // Extract only the text from the transcript-text span, not the timestamp and speaker
+              const transcriptTextSpan = segment.querySelector('.transcript-text');
+              const newText = transcriptTextSpan ? transcriptTextSpan.textContent.trim() : '';
+              const originalText = originalContent[start] || '';
+              
+              if (newText !== originalText) {
+                  changes.push({
+                      start: start,
+                      end: end,
+                      speaker: speaker,
+                      text: newText,
+                      originalText: originalText
+                  });
+              }
+          });
+          
+          if (changes.length === 0) {
+              alert('No changes detected.');
+              toggleEditMode();
+              return;
+          }
+          
+          // Send changes to server
+          const videoFile = window.location.pathname.split('/').pop().replace('.html', '');
+          
+          fetch(`/save_transcript_edits/${videoFile}`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ changes: changes })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert('Changes saved to VTT files! To see your changes in the HTML, please go back to the file list and click "Rerun" for this video.');
+                  toggleEditMode(); // Exit edit mode
+              } else {
+                  alert('Error saving changes: ' + (data.error || 'Unknown error'));
+              }
+          })
+          .catch(error => {
+              console.error('Error saving changes:', error);
+              alert('Error saving changes: ' + error.message);
+          });
+      }
+      
+      function cancelEdits() {
+          if (confirm('Are you sure you want to cancel all edits?')) {
+              const segments = document.querySelectorAll('.transcript-segment');
+              
+              // Restore original content
+              segments.forEach(segment => {
+                  const start = segment.dataset.start;
+                  if (originalContent[start]) {
+                      const textSpan = segment.querySelector('.transcript-text');
+                      if (textSpan) {
+                          textSpan.textContent = originalContent[start];
+                      }
+                  }
+              });
+              
+              toggleEditMode();
           }
       }
       
