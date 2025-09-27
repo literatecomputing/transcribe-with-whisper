@@ -16,6 +16,8 @@ TL;DR: takes a video file, makes an HTML page that tracks the transcription with
 
 ![NotebookLM Nonsense Demo](examples/notebooklm-nonsense.png)
 
+**[📺 View Live Demo](https://raw.githack.com/literatecomputing/transcribe-with-whisper/main/examples/notebooklm-nonsense.html)** - Interactive HTML transcription with synchronized video playback
+
 - Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It should also work on audio-only files, though it may need some fairly simple modifications to do that.
 
 - Separates who is speaking when (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model)
