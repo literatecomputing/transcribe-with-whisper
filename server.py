@@ -439,6 +439,77 @@ async def rerun(filename: str = Form(...)):
   return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
 
 
+@app.post("/update-speakers")
+async def update_speakers(request: Request):
+  """Update speaker names in the configuration file"""
+  try:
+    data = await request.json()
+    filename = data.get('filename')
+    speakers_mapping = data.get('speakers')
+    
+    if not filename or not speakers_mapping:
+      return {"success": False, "message": "Missing filename or speakers data"}
+    
+    # Import the speaker config functions
+    import sys
+    import os
+    import json
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    
+    # The config file is in the video's working directory
+    working_dir = TRANSCRIPTION_DIR / filename
+    config_path = working_dir / f"{filename}-speakers.json"
+    
+    # Load existing config from the working directory
+    speakers = None
+    if config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            # Convert to the format expected by generate_html
+            speakers = {}
+            for speaker_id, info in config.items():
+                if isinstance(info, dict):
+                    speakers[speaker_id] = (info.get('name', speaker_id), 
+                                          info.get('bgcolor', 'lightgray'), 
+                                          info.get('textcolor', 'darkorange'))
+                else:
+                    # Legacy format - just the name
+                    speakers[speaker_id] = (info, 'lightgray', 'darkorange')
+        except (json.JSONDecodeError, KeyError) as e:
+            return {"success": False, "message": f"Could not load speaker config {config_path}: {e}"}
+    
+    if speakers is None:
+      return {"success": False, "message": f"Speaker config file not found: {config_path}"}
+    
+    # Update speaker names based on mapping
+    updated_speakers = {}
+    for speaker_id, (current_name, bgcolor, textcolor) in speakers.items():
+      # Check if this speaker name should be updated
+      new_name = speakers_mapping.get(current_name, current_name)
+      updated_speakers[speaker_id] = (new_name, bgcolor, textcolor)
+    
+    # Save updated config to the working directory
+    updated_config = {}
+    for speaker_id, (name, bgcolor, textcolor) in updated_speakers.items():
+        updated_config[speaker_id] = {
+            'name': name,
+            'bgcolor': bgcolor,
+            'textcolor': textcolor
+        }
+    
+    try:
+        with open(config_path, 'w') as f:
+            json.dump(updated_config, f, indent=2)
+    except Exception as e:
+        return {"success": False, "message": f"Could not save speaker config {config_path}: {e}"}
+    
+    return {"success": True, "message": f"Updated speaker config: {config_path}"}
+    
+  except Exception as e:
+    return {"success": False, "message": f"Error updating speakers: {str(e)}"}
+
+
 @app.get("/edit/{filename}", response_class=HTMLResponse)
 async def edit_transcript(filename: str):
     """Serve the ProseMirror-based transcript editor"""
