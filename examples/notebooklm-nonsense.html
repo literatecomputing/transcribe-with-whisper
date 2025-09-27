@@ -197,7 +197,7 @@
         <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">
           🔄 Reprocess
         </button>
-        <button id="back-to-list-btn" class="edit-btn" onclick="goBackToList()">
+        <button id="back-to-list-btn" class="edit-btn" onclick="">
           📋 View All Files
         </button>
         <button
@@ -4046,7 +4046,7 @@
         console.log(
           "Detected local file mode - hiding server-dependent buttons"
         );
-        document.body.classList.add("local-file-mode");
+        // document.body.classList.add("local-file-mode");
       }
 
       function jumptoTime(time) {
@@ -4237,6 +4237,9 @@
           alert("No changes detected.");
           toggleEditMode();
           return;
+        } else {
+          toggleEditMode();
+          return;
         }
 
         // Send changes to server
@@ -4294,6 +4297,7 @@
             "This will reprocess the current video file. This may take several minutes. Continue?"
           )
         ) {
+          return;
           // Extract filename from current URL or use a data attribute
           const videoElement = document.querySelector("video source");
           if (videoElement) {
