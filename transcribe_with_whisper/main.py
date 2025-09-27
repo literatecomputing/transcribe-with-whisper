@@ -242,6 +242,14 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             border: 1px solid #ffc107;
             border-radius: 2px;
         }}
+        
+        /* Hide server-dependent buttons when viewing as local file */
+        .local-file-mode #edit-mode-btn,
+        .local-file-mode #edit-speakers-btn,
+        .local-file-mode #reprocess-btn,
+        .local-file-mode #back-to-list-btn {{
+            display: none !important;
+        }}
     </style>
 </head>
   <body>
@@ -255,6 +263,9 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     
     <div class="edit-controls">
       <button id="edit-mode-btn" class="edit-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
+      <button id="edit-speakers-btn" class="edit-btn" onclick="editSpeakers()">👥 Edit Speakers</button>
+      <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">🔄 Reprocess</button>
+      <button id="back-to-list-btn" class="edit-btn" onclick="goBackToList()">📋 View All Files</button>
       <button id="save-btn" class="edit-btn" onclick="saveChanges()" style="display: none;">💾 Save Changes</button>
       <button id="cancel-btn" class="edit-btn" onclick="cancelEdits()" style="display: none;">❌ Cancel</button>
       <span id="save-status" class="save-status"></span>
@@ -274,15 +285,22 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
         captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
         for c in captions:
-            start_sec = c[0] / 1000  # Use VTT timestamps directly - they're already correct
-            end_sec = c[1] / 1000
-            startStr = f"{int(start_sec//3600):02d}:{int((start_sec%3600)//60):02d}:{start_sec%60:05.2f}"
-            endStr = f"{int(end_sec//3600):02d}:{int((end_sec%3600)//60):02d}:{end_sec%60:05.2f}"
+            # VTT timestamps are relative to the audio segment, need to add diarization segment start time
+            vtt_start_sec = c[0] / 1000  # VTT timestamp in seconds
+            vtt_end_sec = c[1] / 1000
+            
+            # Add the diarization segment start time to get absolute video time
+            absolute_start_sec = vtt_start_sec + (shift / 1000)
+            absolute_end_sec = vtt_end_sec + (shift / 1000)
+            
+            startStr = f"{int(absolute_start_sec//3600):02d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:05.2f}"
+            endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
+            
             # Include speaker name and timestamp for DOCX export, wrapped for editing
-            html.append(f'      <div class="transcript-segment" data-start="{start_sec}" data-end="{end_sec}" data-speaker="{spkr_name}">')
+            html.append(f'      <div class="transcript-segment" data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}">')
             html.append(f'        <span class="timestamp">[{startStr}] </span>')
             html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
-            html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(start_sec)})">{c[2]}</a></span>')
+            html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>')
             html.append(f'      </div>')
         html.append("    </div>")
     html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->")
@@ -292,11 +310,19 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     <script>
       console.log('Loading video highlight script...');
       
+      // Detect if viewing as local file and hide server-dependent buttons
+      if (window.location.protocol === 'file:') {
+          console.log('Detected local file mode - hiding server-dependent buttons');
+          document.body.classList.add('local-file-mode');
+      }
+      
       function jumptoTime(time){
           var v = document.getElementsByTagName('video')[0];
-          console.log("jumping to time:", time);
+          // Jump back 0.5 seconds before the target to provide context
+          var adjustedTime = Math.max(0, time - 0.5);
+          console.log("jumping to time:", time, "adjusted to:", adjustedTime);
           if (v) {
-              v.currentTime = time;
+              v.currentTime = adjustedTime;
           }
       }
 
@@ -311,7 +337,9 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
           }
           
           var currentTime = v.currentTime;
-          console.log('Current video time:', currentTime);
+          // Add 3 seconds to current time to make highlighting appear ahead of audio
+          var adjustedCurrentTime = currentTime + 3.0;
+          console.log('Current video time:', currentTime, 'adjusted:', adjustedCurrentTime);
           
           // Find all clickable transcript segments
           var segments = document.querySelectorAll('a.lt[onclick]');
@@ -319,7 +347,7 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
           
           var targetSegment = null;
           
-          // Find the segment that should be highlighted based on current video time
+          // Find the segment that should be highlighted based on adjusted video time
           for (var i = 0; i < segments.length; i++) {
               var onclick = segments[i].getAttribute('onclick');
               if (!onclick) continue;
@@ -329,8 +357,8 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
               
               var segmentTime = parseInt(match[1]);
               
-              // Check if this is the current or most recent segment
-              if (segmentTime <= currentTime) {
+              // Check if this is the current or most recent segment using adjusted time
+              if (segmentTime <= adjustedCurrentTime) {
                   targetSegment = segments[i];
               } else {
                   break; // segments are in chronological order
@@ -509,6 +537,129 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
           }
       }
       
+      function reprocessFile() {
+          if (confirm('This will reprocess the current video file. This may take several minutes. Continue?')) {
+              // Extract filename from current URL or use a data attribute
+              const videoElement = document.querySelector('video source');
+              if (videoElement) {
+                  const videoSrc = videoElement.src;
+                  const filename = videoSrc.substring(videoSrc.lastIndexOf('/') + 1);
+                  
+                  // Create a form and submit it like the working version on the main page
+                  const form = document.createElement('form');
+                  form.method = 'post';
+                  form.action = '/rerun';
+                  
+                  const input = document.createElement('input');
+                  input.type = 'hidden';
+                  input.name = 'filename';
+                  input.value = filename;
+                  
+                  form.appendChild(input);
+                  document.body.appendChild(form);
+                  form.submit();
+              } else {
+                  alert('Could not determine video filename');
+              }
+          }
+      }
+      
+      function goBackToList() {
+          window.location.href = '/list';
+      }
+      
+      function editSpeakers() {
+          // Extract current speakers from the page
+          const speakerElements = document.querySelectorAll('.e span[style*="color:"]');
+          const speakers = [];
+          const seenSpeakers = new Set();
+          
+          speakerElements.forEach(el => {
+              const speakerName = el.textContent.trim();
+              if (speakerName && !seenSpeakers.has(speakerName)) {
+                  seenSpeakers.add(speakerName);
+                  speakers.push(speakerName);
+              }
+          });
+          
+          if (speakers.length === 0) {
+              alert('No speakers found in transcript');
+              return;
+          }
+          
+          // Create a simple dialog for editing speaker names
+          let dialogContent = 'Edit Speaker Names:\\n\\n';
+          const newNames = [];
+          
+          for (let i = 0; i < speakers.length; i++) {
+              const currentName = speakers[i];
+              const newName = prompt(dialogContent + `Speaker ${i+1} (currently "${currentName}"):`);
+              
+              if (newName === null) {
+                  // User cancelled
+                  return;
+              }
+              
+              newNames.push(newName.trim() || currentName);
+              dialogContent += `Speaker ${i+1}: "${newNames[i]}"\\n`;
+          }
+          
+          // Show confirmation
+          const confirmed = confirm(
+              'Update speakers with these names?\\n\\n' + 
+              speakers.map((old, i) => `"${old}" → "${newNames[i]}"`).join('\\n') +
+              '\\n\\nThis will reprocess the file with updated speaker names.'
+          );
+          
+          if (confirmed) {
+              updateSpeakersAndReprocess(speakers, newNames);
+          }
+      }
+      
+      function updateSpeakersAndReprocess(oldNames, newNames) {
+          const videoElement = document.querySelector('video source');
+          if (!videoElement) {
+              alert('Could not determine video filename');
+              return;
+          }
+          
+          const videoSrc = videoElement.src;
+          const filename = videoSrc.substring(videoSrc.lastIndexOf('/') + 1);
+          const basename = filename.replace(/\\.[^/.]+$/, ""); // Remove extension
+          
+          // Create speaker mapping
+          const speakerMapping = {};
+          for (let i = 0; i < oldNames.length; i++) {
+              speakerMapping[oldNames[i]] = newNames[i];
+          }
+          
+          // Send update request
+          fetch('/update-speakers', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  filename: basename,
+                  speakers: speakerMapping
+              })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert('Speaker names updated! Reprocessing file...');
+                  // Now reprocess with updated speakers
+                  reprocessFile();
+              } else {
+                  alert('Error updating speakers: ' + (data.message || 'Unknown error'));
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              alert('Error updating speakers: ' + error.message);
+          });
+      }
+      
       // Start initialization when DOM loads
       if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', initializeVideoTracking);
@@ -529,6 +680,61 @@ def cleanup(files):
         if os.path.isfile(f):
             os.remove(f)
 
+def get_speaker_config_path(basename):
+    """Get the path to the speaker configuration file"""
+    return f"{basename}-speakers.json"
+
+def load_speaker_config(basename):
+    """Load speaker configuration from JSON file"""
+    config_path = get_speaker_config_path(basename)
+    if os.path.exists(config_path):
+        try:
+            import json
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            # Convert to the format expected by generate_html
+            speakers = {}
+            for speaker_id, info in config.items():
+                if isinstance(info, dict):
+                    speakers[speaker_id] = (info.get('name', speaker_id), 
+                                          info.get('bgcolor', 'lightgray'), 
+                                          info.get('textcolor', 'darkorange'))
+                else:
+                    # Legacy format - just the name
+                    speakers[speaker_id] = (info, 'lightgray', 'darkorange')
+            return speakers
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Warning: Could not load speaker config {config_path}: {e}")
+            return None
+    return None
+
+def save_speaker_config(basename, speakers):
+    """Save speaker configuration to JSON file"""
+    config_path = get_speaker_config_path(basename)
+    config = {}
+    for speaker_id, (name, bgcolor, textcolor) in speakers.items():
+        config[speaker_id] = {
+            'name': name,
+            'bgcolor': bgcolor,
+            'textcolor': textcolor
+        }
+    
+    try:
+        import json
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        print(f"Saved speaker configuration to {config_path}")
+    except Exception as e:
+        print(f"Warning: Could not save speaker config {config_path}: {e}")
+
+def discover_speakers_from_groups(groups):
+    """Analyze diarization groups to discover which speakers are actually present"""
+    speakers_found = set()
+    for g in groups:
+        speaker = g[0].split()[-1]  # Extract speaker ID from diarization line
+        speakers_found.add(speaker)
+    return sorted(list(speakers_found))
+
 def transcribe_video(inputfile, speaker_names=None):
     basename = Path(inputfile).stem
     workdir = basename
@@ -548,17 +754,56 @@ def transcribe_video(inputfile, speaker_names=None):
     segment_files = export_segments_audio(groups, outputWav)
     vtt_files = transcribe_segments(segment_files)
 
-    # Setup speakers mapping
-    speakers = {}
-    if speaker_names:
-        for i, name in enumerate(speaker_names):
-            speakers[f"SPEAKER_{i:02d}"] = (name, 'lightgray', 'darkorange')
-    else:
-        speakers = {
-            'SPEAKER_00': ('Speaker 1', 'lightgray', 'darkorange'),
-            'SPEAKER_01': ('Speaker 2', '#e1ffc7', 'darkgreen'),
-            'SPEAKER_02': ('Speaker 3', '#e1ffc7', 'darkblue'),
-        }
+    # Discover which speakers are actually present
+    actual_speakers = discover_speakers_from_groups(groups)
+    print(f"Detected speakers: {actual_speakers}")
+
+    # Try to load existing speaker config first
+    speakers = load_speaker_config(basename)
+    
+    if speakers is None:
+        # No config exists, create default mapping
+        speakers = {}
+        default_colors = [
+            ('lightgray', 'darkorange'),
+            ('#e1ffc7', 'darkgreen'), 
+            ('#ffe1e1', 'darkblue'),
+            ('#e1e1ff', 'darkred'),
+            ('#fff1e1', 'darkpurple'),
+            ('#f1e1ff', 'darkcyan')
+        ]
+        
+        if speaker_names:
+            # Use provided speaker names
+            for i, name in enumerate(speaker_names):
+                if i < len(actual_speakers):
+                    speaker_id = actual_speakers[i]
+                    bgcolor, textcolor = default_colors[i % len(default_colors)]
+                    speakers[speaker_id] = (name, bgcolor, textcolor)
+        else:
+            # Create default names for detected speakers
+            for i, speaker_id in enumerate(actual_speakers):
+                bgcolor, textcolor = default_colors[i % len(default_colors)]
+                speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
+        
+        # Save the initial config
+        save_speaker_config(basename, speakers)
+        print(f"Created speaker config file: {get_speaker_config_path(basename)}")
+        print("You can edit speaker names and rerun to update the transcript.")
+    
+    # Ensure all detected speakers have entries (in case new speakers appeared)
+    updated = False
+    for speaker_id in actual_speakers:
+        if speaker_id not in speakers:
+            # New speaker detected, add with default settings
+            i = len(speakers)
+            bgcolor, textcolor = default_colors[i % len(default_colors)]
+            speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
+            updated = True
+    
+    if updated:
+        save_speaker_config(basename, speakers)
+        print("Updated speaker config with newly detected speakers")
 
     generate_html(f"../{basename}.html", groups, vtt_files, inputfile, speakers)
     cleanup([inputWavCache, outputWav] + segment_files)
