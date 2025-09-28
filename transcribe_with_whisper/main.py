@@ -250,6 +250,10 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         .local-file-mode #back-to-list-btn {{
             display: none !important;
         }}
+
+        /* When editing, hide all buttons except Save Changes */
+    .editing .edit-controls button {{ display: none !important; }}
+    .editing .edit-controls #save-btn {{ display: inline-block !important; }}
     </style>
 </head>
   <body>
@@ -426,8 +430,9 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
               // Enter edit mode
               body.classList.add('editing');
               editButton.textContent = '📝 Editing...';
+              // Let CSS control button visibility in edit mode
               saveButton.style.display = 'inline-block';
-              cancelButton.style.display = 'inline-block';
+              // Intentionally keep cancel hidden; only Save should show while editing
               
               // Store original content and make segments editable
               segments.forEach(segment => {
@@ -447,7 +452,7 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
               body.classList.remove('editing');
               editButton.textContent = '📝 Edit Mode';
               saveButton.style.display = 'none';
-              cancelButton.style.display = 'none';
+              // Keep cancel hidden
               
               // Make segments non-editable
               segments.forEach(segment => {
@@ -506,7 +511,7 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
           .then(response => response.json())
           .then(data => {
               if (data.success) {
-                  alert('Changes saved to VTT files! To see your changes in the HTML, please go back to the file list and click "Rerun" for this video.');
+                  alert('Changes saved to VTT files! To see your changes in the HTML, click "Reprocess".');
                   toggleEditMode(); // Exit edit mode
               } else {
                   alert('Error saving changes: ' + (data.error || 'Unknown error'));
