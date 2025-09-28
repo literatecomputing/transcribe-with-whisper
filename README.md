@@ -1,6 +1,3 @@
-osstranscribe.com
-Pri
-
 # transcribe-with-whisper
 
 This set of tools is for people who need to transcribe video (or audio) files, but must protect the privacy of the people in the data set. This uses free AI tools and models to transcribe video and audio files to an HTML file that will show the transcript in your web browser and let you click on a word to be taken to that section of the original data file. A script to convert the HTML to docx is also included.
@@ -12,6 +9,23 @@ It works on macOS (Intel & Apple Silicon), Linux, and Windows (not well tested).
 I've tried very hard to make it work for people whose computer expertise includes little more than being able to install computer programs from a web page and click on stuff in a web browser.
 
 ---
+
+## Quick start
+
+Two ways to use this project:
+
+- MercuryScribe (Web UI)
+
+  - Best for editing and reviewing in your browser
+  - Install: `pip install "transcribe-with-whisper[web]"`
+  - Run: `mercuryscribe` then open http://localhost:5001
+  - More: see `docs/README-mercuryscribe.md`
+
+- transcribe-with-whisper (CLI)
+  - Best for batch processing from the command line
+  - Install: `pip install transcribe-with-whisper`
+  - Run: `transcribe-with-whisper yourfile.mp4 [Speaker1 Speaker2 ...]`
+  - More: see `docs/README-transcribe-with-whisper.md`
 
 ## What this does
 
