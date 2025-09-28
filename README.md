@@ -1,3 +1,6 @@
+osstranscribe.com
+Pri
+
 # transcribe-with-whisper
 
 This set of tools is for people who need to transcribe video (or audio) files, but must protect the privacy of the people in the data set. This uses free AI tools and models to transcribe video and audio files to an HTML file that will show the transcript in your web browser and let you click on a word to be taken to that section of the original data file. A script to convert the HTML to docx is also included.
@@ -13,6 +16,8 @@ I've tried very hard to make it work for people whose computer expertise include
 ## What this does
 
 TL;DR: takes a video file, makes an HTML page that tracks the transcription with the playing video and makes video jump to text that you click. A `.docx` file with timestamps, which should be suitable for use with packages like MAXQDA is also created.
+
+There is a command-line Python version, best if you just want to process a bunch of files, and an interactive version that runs a web server on your computer and lets you edit the text and speakers in your web browser.
 
 ![NotebookLM Nonsense Demo](examples/notebooklm-nonsense.png)
 
@@ -79,21 +84,22 @@ On each model page linked below, click “Use this model” and select "pyannote
 
 ```bash
 export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here
+echo "export HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN" >> ~/.bashrc
 ```
 
 - For Mac (which uses zsh by default) use this to have it automatically added to your environment
 
 ```bash
-echo "export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here" >> ~/.zshrc
+export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here
+echo "export HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN" >> ~/.zshrc
 ```
+
+For both of the above examples, the first line sets the variable for the current terminal session and the second one adds it to a file that is read so that it will be set automatically in new terminal sessions.
 
 - Windows (Command Prompt/PowerShell):
 
 ```cmd
 set HUGGING_FACE_AUTH_TOKEN="hf_your_token_here"
-```
-
-```cmd
 setx HUGGING_FACE_AUTH_TOKEN "%HUGGING_FACE_AUTH_TOKEN%"
 ```
 
