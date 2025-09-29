@@ -78,8 +78,9 @@ def run_preflight():
     check_platform_notes()
     print("✅ All checks passed!\n")
 
-# Run preflight before importing heavy libraries
-run_preflight()
+# Skip preflight checks in test environments or when explicitly disabled
+if not os.getenv("SKIP_PREFLIGHT_CHECKS") and not os.getenv("PYTEST_CURRENT_TEST"):
+    run_preflight()
 
 import sys
 import os
