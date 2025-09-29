@@ -8,6 +8,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import Iterable, List, Optional, Dict
 import json
+
+# Set web server mode to enable graceful startup without token
+os.environ["WEB_SERVER_MODE"] = "1"
 import re
 import webvtt
 
@@ -22,6 +25,43 @@ try:
     _HAS_PYDUB = True
 except ImportError:
     _HAS_PYDUB = False
+
+
+# Token storage functions
+def _get_config_dir() -> Path:
+    """Get the directory where config files are stored"""
+    config_dir = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "transcription-files"))) / ".config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+def _save_hf_token(token: str) -> None:
+    """Save Hugging Face token to config file"""
+    config_file = _get_config_dir() / "hf_token"
+    # Set restrictive permissions before writing
+    config_file.touch(mode=0o600)
+    config_file.write_text(token.strip(), encoding='utf-8')
+    # Ensure permissions are correct after writing
+    config_file.chmod(0o600)
+
+def _load_hf_token() -> str | None:
+    """Load Hugging Face token from config file"""
+    config_file = _get_config_dir() / "hf_token"
+    if config_file.exists():
+        try:
+            token = config_file.read_text(encoding='utf-8').strip()
+            return token if token else None
+        except (OSError, UnicodeDecodeError):
+            return None
+    return None
+
+def _get_hf_token() -> str | None:
+    """Get HF token from environment or config file"""
+    # Check environment first (for backward compatibility)
+    env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+    if env_token:
+        return env_token
+    # Fall back to stored token
+    return _load_hf_token()
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -85,10 +125,225 @@ INDEX_HTML = """
   </html>
 """
 
+SETUP_HTML = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <title>MercuryScribe Setup</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background: #f8f9fa; }
+      .card { background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+      h1 { margin: 0 0 1rem; color: #333; }
+      h2 { margin: 1.5rem 0 1rem; color: #444; font-size: 1.2rem; }
+      .steps { counter-reset: step; }
+      .step { counter-increment: step; margin: 1.5rem 0; }
+      .step::before { content: counter(step); background: #0d6efd; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; margin-right: 0.75rem; font-weight: bold; font-size: 0.9rem; }
+      .tip { color: #666; font-size: .95rem; background: #f6f8fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #0d6efd; }
+      .warning { color: #856404; background: #fff3cd; border-left: 4px solid #ffc107; }
+      .success { color: #155724; background: #d4edda; border-left: 4px solid #28a745; }
+      .error { color: #721c24; background: #f8d7da; border-left: 4px solid #dc3545; }
+      code { background: #f6f8fa; padding: .2rem .4rem; border-radius: 4px; font-size: 0.9rem; }
+      a { color: #0d6efd; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      input[type=text], input[type=password] { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+      button { background: #0d6efd; color: white; border: 0; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+      button:disabled { opacity: .6; cursor: not-allowed; }
+      button.secondary { background: #6c757d; }
+      .form-group { margin: 1rem 0; }
+      label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+      .token-form { margin-top: 1.5rem; }
+      .status { margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none; }
+      .button-group { display: flex; gap: 1rem; margin-top: 1.5rem; }
+      .token-preview { font-family: monospace; background: #f8f9fa; padding: 0.5rem; border: 1px solid #dee2e6; border-radius: 4px; margin: 0.5rem 0; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <div class=\"card\">
+      <h1>🚀 Welcome to MercuryScribe!</h1>
+      <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
+      
+      <div class=\"tip warning\">
+        <strong>Privacy Notice:</strong> Your token will be stored securely on this server only. It's never transmitted anywhere except to HuggingFace for authentication.
+      </div>
+    </div>
+
+    <div class=\"card\">
+      <h2>📋 Setup Steps</h2>
+      <div class=\"steps\">
+        <div class=\"step\">
+          <strong>Create a HuggingFace account</strong> if you don't have one at <a href=\"https://huggingface.co/join\" target=\"_blank\">huggingface.co/join</a>
+        </div>
+        <div class=\"step\">
+          <strong>Get your access token</strong> by visiting <a href=\"https://huggingface.co/settings/tokens\" target=\"_blank\">HuggingFace Settings → Access Tokens</a>
+        </div>
+        <div class=\"step\">
+          <strong>Create a new token</strong> with these settings:
+          <ul style=\"margin: 0.5rem 0; padding-left: 2rem;\">
+            <li><strong>Name:</strong> MercuryScribe (or any name you prefer)</li>
+            <li><strong>Type:</strong> Read (default)</li>
+            <li><strong>No expiration</strong> (recommended) or set your preferred expiry</li>
+          </ul>
+        </div>
+        <div class=\"step\">
+          <strong>Copy the token</strong> - it should start with <code>hf_</code> and be about 37 characters long
+        </div>
+        <div class=\"step\">
+          <strong>Paste it below</strong> and click "Save Token"
+        </div>
+      </div>
+
+      <div class=\"tip\">
+        <strong>💡 Tip:</strong> Your token looks like <code>hf_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890</code> - a mix of letters and numbers after "hf_"
+      </div>
+    </div>
+
+    <div class=\"card\">
+      <h2>🔑 Enter Your Token</h2>
+      <div class=\"token-form\">
+        <div class=\"form-group\">
+          <label for=\"token\">HuggingFace Access Token:</label>
+          <input type=\"password\" id=\"token\" placeholder=\"Paste your token here (starts with hf_)\" maxlength=\"50\">
+          <small style=\"color: #666; display: block; margin-top: 0.25rem;\">
+            Your token is hidden for security. Click "Show" to verify it's correct.
+          </small>
+        </div>
+        
+        <div class=\"button-group\">
+          <button onclick=\"toggleTokenVisibility()\" class=\"secondary\" id=\"toggleBtn\">👁️ Show</button>
+          <button onclick=\"validateAndSaveToken()\" id=\"saveBtn\">💾 Save Token</button>
+        </div>
+        
+        <div id=\"status\" class=\"status\"></div>
+      </div>
+    </div>
+
+    <div class=\"card\" id=\"successCard\" style=\"display: none;\">
+      <h2>✅ Setup Complete!</h2>
+      <p>Your HuggingFace token has been saved and validated successfully. You can now use MercuryScribe to transcribe your audio and video files.</p>
+      <button onclick=\"window.location.href='/'\" style=\"background: #28a745;\">🎯 Start Transcribing</button>
+    </div>
+
+    <script>
+      let tokenVisible = false;
+      
+      function toggleTokenVisibility() {
+        const tokenInput = document.getElementById('token');
+        const toggleBtn = document.getElementById('toggleBtn');
+        
+        tokenVisible = !tokenVisible;
+        tokenInput.type = tokenVisible ? 'text' : 'password';
+        toggleBtn.textContent = tokenVisible ? '🙈 Hide' : '👁️ Show';
+      }
+      
+      async function validateAndSaveToken() {
+        const token = document.getElementById('token').value.trim();
+        const saveBtn = document.getElementById('saveBtn');
+        const status = document.getElementById('status');
+        
+        if (!token) {
+          showStatus('Please enter your HuggingFace token.', 'error');
+          return;
+        }
+        
+        if (!token.startsWith('hf_')) {
+          showStatus('Invalid token format. HuggingFace tokens start with \"hf_\".', 'error');
+          return;
+        }
+        
+        saveBtn.disabled = true;
+        saveBtn.textContent = '⏳ Validating...';
+        
+        try {
+          const response = await fetch('/api/save-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: token })
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.success) {
+            showStatus('✅ Token saved successfully! Redirecting...', 'success');
+            document.getElementById('successCard').style.display = 'block';
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 2000);
+          } else {
+            showStatus(`❌ ${result.error || 'Failed to save token. Please check your token and try again.'}`, 'error');
+          }
+        } catch (error) {
+          showStatus('❌ Network error. Please check your connection and try again.', 'error');
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save Token';
+        }
+      }
+      
+      function showStatus(message, type) {
+        const status = document.getElementById('status');
+        status.className = `status ${type}`;
+        status.textContent = message;
+        status.style.display = 'block';
+      }
+      
+      // Allow Enter key to submit
+      document.getElementById('token').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          validateAndSaveToken();
+        }
+      });
+      
+      // Auto-focus the token input
+      document.getElementById('token').focus();
+    </script>
+  </body>
+</html>
+"""
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(_: Request):
+    if not _has_valid_token():
+        return RedirectResponse(url="/setup", status_code=303)
     return HTMLResponse(INDEX_HTML)
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page(_: Request):
+    return HTMLResponse(SETUP_HTML)
+
+
+@app.post("/api/save-token")
+async def save_token(request: Request):
+    """Save and validate the Hugging Face token"""
+    try:
+        data = await request.json()
+        token = data.get("token", "").strip()
+        
+        if not token:
+            return {"success": False, "error": "Token is required"}
+        
+        # Validate the token
+        validation = _validate_hf_token(token)
+        if not validation["valid"]:
+            return {"success": False, "error": validation["error"]}
+        
+        # Save the token
+        _save_hf_token(token)
+        return {"success": True, "message": "Token saved and validated successfully"}
+        
+    except Exception as e:
+        return {"success": False, "error": f"Failed to save token: {str(e)}"}
+
+
+@app.get("/api/check-token")
+async def check_token():
+    """Check if we have a valid token"""
+    return {"has_token": _has_valid_token()}
 
 
 @app.get("/api/job/{job_id}")
@@ -177,7 +432,7 @@ def _build_cli_cmd(filename: str, speakers: Optional[List[str]] = None) -> List[
 
 
 def _validate_hf_token_or_die() -> None:
-    token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+    token = _get_hf_token()
     if not token:
         raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
     try:
@@ -191,13 +446,38 @@ def _validate_hf_token_or_die() -> None:
             "'pyannote/speaker-diarization' and 'pyannote/segmentation-3.0'. Original error: " + str(e)
         )
 
+def _validate_hf_token(token: str) -> dict:
+    """Validate a Hugging Face token and return validation result"""
+    if not token:
+        return {"valid": False, "error": "Token is empty"}
+    
+    try:
+        api = HfApi()
+        api.model_info("pyannote/speaker-diarization", token=token)
+        api.model_info("pyannote/segmentation-3.0", token=token)
+        return {"valid": True, "message": "Token validated successfully"}
+    except Exception as e:
+        return {"valid": False, "error": f"Token validation failed: {str(e)}"}
+
+def _has_valid_token() -> bool:
+    """Check if we have a valid stored token"""
+    token = _get_hf_token()
+    if not token:
+        return False
+    result = _validate_hf_token(token)
+    return result["valid"]
+
 
 @app.on_event("startup")
 def startup_check_token():
     if os.getenv("SKIP_HF_STARTUP_CHECK") == "1":
         print("⚠️  Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
         return
-    _validate_hf_token_or_die()
+    
+    if _has_valid_token():
+        print("✅ Hugging Face token found and validated.")
+    else:
+        print("⚠️  No valid Hugging Face token found. Users will be guided through setup.")
 
 
 def _human_size(n: int) -> str:
@@ -834,6 +1114,9 @@ async def save_transcript_edits(basename: str, request: Request):
 def main() -> None:
     """Run the MercuryScribe web server via uvicorn."""
     import uvicorn
+    
+    # Set web server mode to enable graceful startup without token
+    os.environ["WEB_SERVER_MODE"] = "1"
 
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "5001"))

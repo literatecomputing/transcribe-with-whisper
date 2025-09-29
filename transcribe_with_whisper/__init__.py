@@ -59,6 +59,11 @@ def check_hf_token():
         sys.exit(1)
     return token
 
+def check_hf_token_graceful():
+    """Check for HF token without exiting - for web server mode"""
+    token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+    return token
+
 def check_models(token):
     from huggingface_hub import HfApi
     try:
@@ -73,13 +78,25 @@ def check_models(token):
 def run_preflight():
     print("🔎 Running preflight checks...")
     check_ffmpeg()
-    token = check_hf_token()
-    check_models(token)
+    
+    # Check if we're in web server mode (skip token validation for graceful startup)
+    if os.getenv("WEB_SERVER_MODE") == "1":
+        token = check_hf_token_graceful()
+        if token:
+            check_models(token)
+        else:
+            print("⚠️  No HF token found - web server will guide users through setup.")
+    else:
+        token = check_hf_token()
+        check_models(token)
+    
     check_platform_notes()
     print("✅ All checks passed!\n")
 
-# Skip preflight checks in test environments or when explicitly disabled
-if not os.getenv("SKIP_PREFLIGHT_CHECKS") and not os.getenv("PYTEST_CURRENT_TEST"):
+# Skip preflight checks in test environments, when explicitly disabled, or in web server mode
+if (not os.getenv("SKIP_PREFLIGHT_CHECKS") 
+    and not os.getenv("PYTEST_CURRENT_TEST") 
+    and not os.getenv("WEB_SERVER_MODE")):
     run_preflight()
 
 import sys
