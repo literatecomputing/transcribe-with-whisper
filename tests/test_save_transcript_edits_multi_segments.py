@@ -43,7 +43,7 @@ def test_edits_nearest_start_within_tolerance(tmp_path: Path):
     client = TestClient(app)
 
     # Change targets time 12.05s (closest to B one at 12.000 within 3s tolerance)
-    change = {"start": "00:00:12.050", "end": "00:00:12.900", "text": "Edited B one"}
+    change = {"start": "00:00:12.050", "end": "00:00:12.900", "text": "Edited B one", "vttFile": "1.vtt", "captionIdx": "0"}
     resp = client.post("/save_transcript_edits/talk", json={"changes": [change]})
     assert resp.status_code == 200
     t1_caps = list(webvtt.read(str(base / '1.vtt')))

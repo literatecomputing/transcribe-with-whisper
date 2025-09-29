@@ -18,9 +18,9 @@ def test_save_edits_updates_vtts_using_artifacts(app_with_artifacts):
     assert c0 and c1 and c2, "Expected at least one caption in 0.vtt, 1.vtt, 2.vtt"
 
     changes = [
-        {"start": c0[0].start, "end": c0[0].end, "speaker": "Speaker 1", "text": "edited-0", "originalText": c0[0].text},
-        {"start": c1[0].start, "end": c1[0].end, "speaker": "Speaker 2", "text": "edited-1", "originalText": c1[0].text},
-        {"start": c2[0].start, "end": c2[0].end, "speaker": "Speaker 3", "text": "edited-2", "originalText": c2[0].text},
+        {"start": c0[0].start, "end": c0[0].end, "speaker": "Speaker 1", "text": "edited-0", "originalText": c0[0].text, "vttFile": "0.vtt", "captionIdx": "0"},
+        {"start": c1[0].start, "end": c1[0].end, "speaker": "Speaker 2", "text": "edited-1", "originalText": c1[0].text, "vttFile": "1.vtt", "captionIdx": "0"},
+        {"start": c2[0].start, "end": c2[0].end, "speaker": "Speaker 3", "text": "edited-2", "originalText": c2[0].text, "vttFile": "2.vtt", "captionIdx": "0"},
     ]
 
     resp = client.post(f"/save_transcript_edits/{ctx.basename}", json={"changes": changes})
@@ -52,7 +52,7 @@ def test_save_single_edit_first_speaker_only(app_with_artifacts):
     original = c0[0].text
 
     changes = [
-        {"start": c0[0].start, "end": c0[0].end, "speaker": "Speaker 1", "text": "edited-only-0", "originalText": original},
+        {"start": c0[0].start, "end": c0[0].end, "speaker": "Speaker 1", "text": "edited-only-0", "originalText": original, "vttFile": "0.vtt", "captionIdx": "0"},
     ]
 
     resp = client.post(f"/save_transcript_edits/{ctx.basename}", json={"changes": changes})
