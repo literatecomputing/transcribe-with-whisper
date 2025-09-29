@@ -5,3 +5,8 @@ pyannote.audio
 huggingface_hub
 torch       # CPU-only by default
 faster-whisper
+
+# Web server dependencies (for enhanced progress tracking)
+fastapi
+uvicorn[standard]
+python-multipart
