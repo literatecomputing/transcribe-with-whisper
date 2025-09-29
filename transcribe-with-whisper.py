@@ -180,6 +180,9 @@ if not auth_token:
     raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
 
 pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization', use_auth_token=auth_token)
+pipeline = Pipeline.from_pretrained(
+    "pyannote/speaker-diarization-community-1", 
+    token=auth_token)
 
 DEMO_FILE = {'uri': 'blabla', 'audio': outputWav}
 
