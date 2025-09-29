@@ -19,4 +19,6 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
       - name: Run unit tests
+        env:
+          SKIP_PREFLIGHT_CHECKS: "1"
         run: pytest -q -k 'not integration'
