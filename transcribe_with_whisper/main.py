@@ -288,7 +288,8 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
         html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
         captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
-        for c in captions:
+        vtt_filename = Path(vtt_files[idx]).name
+        for ci, c in enumerate(captions):
             # VTT timestamps are relative to the audio segment, need to add diarization segment start time
             vtt_start_sec = c[0] / 1000  # VTT timestamp in seconds
             vtt_end_sec = c[1] / 1000
@@ -301,7 +302,11 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
             
             # Include speaker name and timestamp for DOCX export, wrapped for editing
-            html.append(f'      <div class="transcript-segment" data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}">')
+            # Add VTT file and timestamp data attributes for precise editing
+            html.append(f'      <div class="transcript-segment" '
+                       f'data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}" '
+                       f'data-vtt-file="{vtt_filename}" data-vtt-start="{vtt_start_sec}" data-vtt-end="{vtt_end_sec}" '
+                       f'data-caption-idx="{ci}">')
             html.append(f'        <span class="timestamp">[{startStr}] </span>')
             html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
             html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>')
@@ -475,6 +480,10 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
               const start = segment.dataset.start;
               const end = segment.dataset.end;
               const speaker = segment.dataset.speaker || '';
+              const vttFile = segment.dataset.vttFile || '';
+              const vttStart = segment.dataset.vttStart || '';
+              const vttEnd = segment.dataset.vttEnd || '';
+              const captionIdx = segment.dataset.captionIdx || '';
               
               // Extract only the text from the transcript-text span, not the timestamp and speaker
               const transcriptTextSpan = segment.querySelector('.transcript-text');
@@ -483,11 +492,16 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
               
               if (newText !== originalText) {
                   changes.push({
+                      // absolute timings are still included for UI uses, but server will rely on VTT-local hints
                       start: start,
                       end: end,
                       speaker: speaker,
                       text: newText,
-                      originalText: originalText
+                      originalText: originalText,
+                      vttFile: vttFile,
+                      vttStart: vttStart,
+                      vttEnd: vttEnd,
+                      captionIdx: captionIdx
                   });
               }
           });
