@@ -1,12 +1,12 @@
 # Core dependencies
-pydub 0.25.1
-webvtt-py 0.5.1
-pyannote.audio 3.4.0
-huggingface_hub 0.35.3
-torch  2.8.0     # CPU-only by default
-faster-whisper 1.2.0
+pydub==0.25.1
+webvtt-py==0.5.1
+pyannote.audio==3.4.0
+huggingface_hub==0.35.3
+torch==2.8.0     # CPU-only by default
+faster-whisper==1.2.0
 
 # Web server dependencies (for enhanced progress tracking)
-fastapi
-uvicorn[standard]
-python-multipart
+fastapi==0.116.2
+uvicorn[standard]==0.30.6
+python-multipart==0.0.20
