@@ -5,18 +5,18 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="transcribe-with-whisper",
-    version="0.3.0",
+    version="0.4.0",
     packages=find_packages(),
     install_requires=[
-        "pydub",
-        "webvtt-py",
-        "pyannote.audio",
-        "huggingface_hub",
-        "torch",
-        "faster-whisper",
-        "fastapi",
-        "uvicorn[standard]",
-        "python-multipart",
+        "pydub==0.25.1",
+        "webvtt-py==0.5.1",
+        "pyannote.audio==3.4.0",
+        "huggingface_hub==0.35.3",
+        "torch==2.8.0",
+        "faster-whisper==1.2.0",
+        "fastapi==0.116.2",
+        "uvicorn[standard]==0.30.6",
+        "python-multipart==0.0.20",
     ],
     extras_require={
         # Web dependencies are now included in core install_requires
