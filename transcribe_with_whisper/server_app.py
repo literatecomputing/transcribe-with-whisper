@@ -3,6 +3,7 @@ import sys
 import shutil
 import subprocess
 import threading
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Iterable, List, Optional, Dict
@@ -14,6 +15,13 @@ from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from huggingface_hub import HfApi
+
+# Add support for getting audio file duration
+try:
+    from pydub import AudioSegment
+    _HAS_PYDUB = True
+except ImportError:
+    _HAS_PYDUB = False
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -204,6 +212,141 @@ def _list_dir_entries(path: Path) -> Iterable[Path]:
     return sorted([p for p in path.iterdir() if p.is_file()], key=lambda p: p.name.lower())
 
 
+def _get_audio_duration(file_path: Path) -> Optional[float]:
+    """Get duration of audio/video file in seconds"""
+    try:
+        if _HAS_PYDUB:
+            # Try pydub first (more reliable for various formats)
+            audio = AudioSegment.from_file(str(file_path))
+            return len(audio) / 1000.0  # Convert ms to seconds
+        else:
+            # Fallback to ffprobe if pydub not available
+            result = subprocess.run([
+                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1', str(file_path)
+            ], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                return float(result.stdout.strip())
+    except Exception:
+        pass
+    return None
+
+
+def _format_duration(seconds: float) -> str:
+    """Format duration in seconds to MM:SS format"""
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}:{secs:02d}"
+
+
+def _format_elapsed_time(start_time: float) -> str:
+    """Format elapsed time since start_time"""
+    elapsed = time.time() - start_time
+    if elapsed < 60:
+        return f"{elapsed:.0f}s"
+    else:
+        minutes = int(elapsed // 60)
+        seconds = int(elapsed % 60)
+        return f"{minutes}m {seconds}s"
+
+
+def _update_progress_from_output(job_id: str, line: str):
+    """Parse CLI output line and update job progress"""
+    global jobs
+    
+    if job_id not in jobs:
+        return
+    
+    line = line.strip()
+    if not line:
+        return
+    
+    # Progress estimation based on recognizable output patterns
+    try:
+        # Phase 1: Initial setup and preflight (5-10%)
+        if "Running preflight checks" in line:
+            jobs[job_id]["progress"] = 5
+            jobs[job_id]["message"] = "Running preflight checks..."
+        elif "ffmpeg found:" in line:
+            jobs[job_id]["progress"] = 7
+            jobs[job_id]["message"] = "Checking system dependencies..."
+        elif "All checks passed" in line:
+            jobs[job_id]["progress"] = 10
+            jobs[job_id]["message"] = "System checks complete..."
+        
+        # Phase 2: Audio processing (10-20%)
+        elif "Input #0" in line and ("mp3" in line or "mp4" in line or "wav" in line):
+            jobs[job_id]["progress"] = 12
+            jobs[job_id]["message"] = "Reading input audio/video..."
+        elif "ffmpeg" in line and "size=" in line and "time=" in line:
+            jobs[job_id]["progress"] = 18
+            jobs[job_id]["message"] = "Converting audio format..."
+        
+        # Phase 3: AI model loading (20-25%)
+        elif "Loading Whisper model" in line:
+            jobs[job_id]["progress"] = 22
+            jobs[job_id]["message"] = "Loading Whisper AI model..."
+        elif "Pipeline.from_pretrained" in line or "pyannote" in line:
+            jobs[job_id]["progress"] = 25
+            # Enhanced message with file duration
+            file_duration = jobs[job_id].get("file_duration", "Unknown duration")
+            duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
+            jobs[job_id]["message"] = f"Loading speaker diarization model for {duration_str} audio file..."
+        
+        # Phase 4: Speaker diarization (25-50%) - Longest phase
+        elif "DEMO_FILE" in line or "diarization" in line.lower():
+            jobs[job_id]["progress"] = 30
+            # Enhanced message with file duration and elapsed time
+            file_duration = jobs[job_id].get("file_duration", "Unknown duration")
+            start_time = jobs[job_id].get("start_time", time.time())
+            elapsed_time = time.time() - start_time
+            
+            duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
+            elapsed_str = _format_elapsed_time(elapsed_time)
+            
+            jobs[job_id]["message"] = f"Running speaker diarization AI on {duration_str} audio file... (elapsed: {elapsed_str})"
+        elif "Detected speakers:" in line:
+            jobs[job_id]["progress"] = 50
+            # Extract speaker information for better UX
+            if "[" in line and "]" in line:
+                speaker_part = line.split("Detected speakers:")[1].strip()
+                jobs[job_id]["message"] = f"Speaker diarization complete - {speaker_part}"
+            else:
+                jobs[job_id]["message"] = "Speaker diarization complete..."
+        
+        # Phase 5: Segment transcription (50-80%)
+        elif "Processing" in line and ".wav" in line:
+            # Increment progress for each segment being processed
+            current = jobs[job_id]["progress"]
+            jobs[job_id]["progress"] = min(current + 3, 80)
+            # Extract segment number if possible
+            segment_match = line.split("Processing ")[1].split(".wav")[0] if "Processing " in line else "segment"
+            jobs[job_id]["message"] = f"Transcribing audio segment {segment_match}..."
+        
+        # Phase 6: HTML generation (80-95%)
+        elif "generate_html" in line or "Script completed successfully" in line:
+            jobs[job_id]["progress"] = 90
+            jobs[job_id]["message"] = "Generating HTML transcript..."
+        elif "Output:" in line and ".html" in line:
+            jobs[job_id]["progress"] = 95
+            jobs[job_id]["message"] = "Transcription complete, preparing files..."
+        
+        # Error detection
+        elif any(error_word in line.upper() for error_word in ["ERROR", "FAILED", "EXCEPTION", "TRACEBACK"]):
+            jobs[job_id]["message"] = f"Error: {line[:100]}..."
+        
+        # Progress safety: Ensure we never go backwards and don't stall
+        else:
+            current_progress = jobs[job_id]["progress"]
+            # Very gradual increment for any other output (prevents stalling)
+            if current_progress < 85 and len(line) > 10:  # Only for substantive output
+                jobs[job_id]["progress"] = min(current_progress + 0.5, 85)
+    
+    except Exception as e:
+        # Don't let progress parsing errors break the job
+        pass
+
+
 def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[str]]):
     global jobs
     try:
@@ -212,23 +355,46 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
         jobs[job_id]["progress"] = 5
 
         cmd = _build_cli_cmd(filename, speakers or None)
-        jobs[job_id]["message"] = "Processing audio and running AI models..."
-        jobs[job_id]["progress"] = 20
-
-        proc = subprocess.run(
+        
+        # Use Popen for real-time output monitoring
+        import subprocess
+        import threading
+        
+        proc = subprocess.Popen(
             cmd,
             cwd=str(TRANSCRIPTION_DIR),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            check=False,
+            bufsize=1,
+            universal_newlines=True
         )
-
-        jobs[job_id]["progress"] = 80
+        
+        # Monitor output in real-time
+        output_lines = []
+        
+        def monitor_output():
+            nonlocal output_lines
+            for line in iter(proc.stdout.readline, ''):
+                if line:
+                    output_lines.append(line.strip())
+                    _update_progress_from_output(job_id, line.strip())
+        
+        monitor_thread = threading.Thread(target=monitor_output)
+        monitor_thread.daemon = True
+        monitor_thread.start()
+        
+        # Wait for process to complete
+        proc.wait()
+        monitor_thread.join(timeout=1)  # Give thread a moment to finish
+        
         if proc.returncode != 0:
             jobs[job_id]["status"] = "error"
             jobs[job_id]["message"] = f"CLI failed with code {proc.returncode}"
-            jobs[job_id]["error"] = f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
+            jobs[job_id]["error"] = f"OUTPUT:\n" + "\n".join(output_lines)
             return
+
+        jobs[job_id]["progress"] = 80
 
         basename = Path(filename).stem
         html_out = TRANSCRIPTION_DIR / f"{basename}.html"
@@ -281,11 +447,16 @@ async def upload(file: UploadFile = File(...), speaker: Optional[List[str]] = Fo
     job_id = str(job_counter)
     speakers = [s.strip() for s in (speaker or []) if s and s.strip()]
 
+    # Get audio duration for progress feedback
+    file_duration = _get_audio_duration(dest_path)
+    
     jobs[job_id] = {
         "status": "starting",
         "progress": 0,
         "message": "Preparing transcription...",
         "filename": file.filename,
+        "start_time": time.time(),
+        "file_duration": file_duration,
     }
 
     thread = threading.Thread(target=_run_transcription_job, args=(job_id, file.filename, speakers))
@@ -373,11 +544,17 @@ async def rerun(filename: str = Form(...)):
 
     job_counter += 1
     job_id = str(job_counter)
+    
+    # Get audio duration for progress feedback
+    file_duration = _get_audio_duration(target)
+    
     jobs[job_id] = {
         "status": "starting",
         "progress": 0,
         "message": "Preparing transcription...",
         "filename": filename,
+        "start_time": time.time(),
+        "file_duration": file_duration,
     }
 
     thread = threading.Thread(target=_run_transcription_job, args=(job_id, target.name, None))
