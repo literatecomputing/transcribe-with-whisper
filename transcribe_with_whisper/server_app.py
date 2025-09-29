@@ -827,7 +827,6 @@ async def save_transcript_edits(basename: str, request: Request):
                     f.write(f"{seg['start_time']} --> {seg['end_time']}\n")
                     f.write(f"{seg['text']}\n\n")
 
-        _regenerate_html_from_vtt(basename)
         return {"success": True, "message": "Transcript saved successfully"}
     except Exception as e:
         return {"success": False, "error": str(e)}
