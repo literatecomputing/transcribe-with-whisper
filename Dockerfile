@@ -15,10 +15,9 @@ RUN apt-get update \
 # Copy the project
 COPY . /app
 
-# Install Python dependencies (server + package + CLI)
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir fastapi uvicorn[standard] python-multipart \
-    && pip install --no-cache-dir transcribe-with-whisper
+    && pip install --no-cache-dir -e .
 
 # Runtime env and directories (new default directory name)
 ENV TRANSCRIPTION_DIR=/app/transcription-files \

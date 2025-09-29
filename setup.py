@@ -14,13 +14,13 @@ setup(
         "huggingface_hub",
         "torch",
         "faster-whisper",
+        "fastapi",
+        "uvicorn[standard]",
+        "python-multipart",
     ],
     extras_require={
-        "web": [
-            "fastapi",
-            "uvicorn[standard]",
-            "python-multipart",
-        ]
+        # Web dependencies are now included in core install_requires
+        # Keep this for backward compatibility if needed
     },
     entry_points={
         "console_scripts": [
