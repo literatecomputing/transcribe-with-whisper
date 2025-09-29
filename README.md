@@ -84,6 +84,7 @@ On each model page linked below, click “Use this model” and select "pyannote
 
 - Required: pyannote/speaker-diarization-3.1 → https://huggingface.co/pyannote/speaker-diarization-3.1
 - Required: pyannote/segmentation-3.0 → https://huggingface.co/pyannote/segmentation-3.0
+- Required: https://huggingface.co/pyannote/speaker-diarization-community-1
 
 3. Create a read-access token
 
@@ -138,7 +139,7 @@ export HUGGING_FACE_AUTH_TOKEN=hf_your_token_here
 
 Well, that's what makes the second line of the command below work.
 
-You'll need to open a terminal and paste this in. On a Mac you can type "command-space" and then "termin" for it to suggest the terminal program.
+You'll need to open a terminal and paste this in. On a Mac you can type "command-space" and then "terminal".
 
 #### Web User Interface
 
@@ -171,6 +172,8 @@ docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the transcription-files folder that is created in the folder/directory where you run the above command. Both HTML and DOCX files are automatically generated for each transcription.
 
 #### Command Line Interface
+
+You do not need to edit this line, it uses the HUGGING_FACE_AUTH_TOKEN set above.
 
 ```bash
 docker run --rm -it \
