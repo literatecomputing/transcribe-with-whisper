@@ -421,7 +421,11 @@ def _load_transcript_data(basename: str):
 
 @app.post("/save_transcript_edits/{basename}")
 async def save_in_place_transcript_edits(basename: str, request: Request):
-    """Save in-place edited transcript changes back to VTT files"""
+    """Save in-place edited transcript changes back to VTT files using precise VTT file and caption index"""
+    
+    # Enable debug logging if requested
+    debug = os.getenv("DEBUG_SAVE_EDITS") == "1"
+    
     try:
         data = await request.json()
         changes = data.get("changes", [])
@@ -432,102 +436,106 @@ async def save_in_place_transcript_edits(basename: str, request: Request):
         if not vtt_dir.exists():
             return {"success": False, "error": f"Transcript directory not found: {basename}"}
 
-        vtt_files = list(vtt_dir.glob("*.vtt"))
-        if not vtt_files:
-            return {"success": False, "error": "No VTT files found"}
+        if debug:
+            print(f"[DEBUG] Processing {len(changes)} changes for {basename}")
 
-        # Helper to convert timestamp ("hh:mm:ss.mmm" or "mm:ss.mmm" or seconds string) to seconds
-        def to_seconds(value: str | float | int) -> float:
-            if isinstance(value, (int, float)):
-                return float(value)
-            s = str(value).strip().replace(',', '.')
-            if not s:
-                return 0.0
-            if ':' not in s:
-                # raw seconds string
-                try:
-                    return float(s)
-                except ValueError:
-                    return 0.0
-            parts = s.split(':')
-            try:
-                if len(parts) == 3:
-                    h, m, sec = int(parts[0]), int(parts[1]), float(parts[2])
-                    return h * 3600 + m * 60 + sec
-                elif len(parts) == 2:
-                    m, sec = int(parts[0]), float(parts[1])
-                    return m * 60 + sec
-                else:
-                    return float(s)
-            except ValueError:
-                return 0.0
-
-        # Tolerances (seconds)
-        start_tolerance = 3.0
-        end_tolerance = 3.0
-
-        # Load captions for all VTT files once
-        vtt_caps = {v: webvtt.read(str(v)) for v in vtt_files}
+        # Track which VTT files we've modified
         modified_files: set[Path] = set()
-
         applied = 0
-        unmatched: List[dict] = []
+        failed: List[dict] = []
 
-        # For each change, try to find a matching caption in any speaker VTT
         for change in changes:
-            change_start = to_seconds(change.get("start", 0.0))
-            change_end = to_seconds(change.get("end", change_start))
-            new_text = (change.get("text") or "").strip()
-            if not new_text:
-                # Allow clearing text, but keep as empty
-                pass
+            # Extract VTT-specific information from the change
+            vtt_file = change.get("vttFile", "").strip()
+            caption_idx_str = change.get("captionIdx", "").strip()
+            new_text = change.get("text", "").strip()
+            
+            if debug:
+                print(f"[DEBUG] Change: vttFile='{vtt_file}', captionIdx='{caption_idx_str}', text='{new_text[:50]}...'")
 
-            found = False
-            # Pass 1: containment by [start,end] with tolerance
-            for vtt_file, captions in vtt_caps.items():
-                for idx, cap in enumerate(captions):
-                    cap_start = to_seconds(cap.start)
-                    cap_end = to_seconds(cap.end)
-                    if (cap_start - start_tolerance) <= change_start <= (cap_end + end_tolerance):
-                        if captions[idx].text.strip() != new_text:
-                            captions[idx].text = new_text
-                            modified_files.add(vtt_file)
-                        applied += 1
-                        found = True
-                        break
-                if found:
-                    break
+            # Validate that we have the required VTT-specific information
+            if not vtt_file or not caption_idx_str:
+                if debug:
+                    print(f"[DEBUG] Missing VTT info, skipping change")
+                failed.append({
+                    "error": "Missing vttFile or captionIdx - HTML may be from legacy version",
+                    "change": change
+                })
+                continue
 
-            # Pass 2: nearest caption start within tolerance if not found
-            if not found:
-                best_file: Optional[Path] = None
-                best_idx: Optional[int] = None
-                best_diff = 1e9
-                for vtt_file, captions in vtt_caps.items():
-                    for idx, cap in enumerate(captions):
-                        cap_start = to_seconds(cap.start)
-                        diff = abs(cap_start - change_start)
-                        if diff < best_diff:
-                            best_diff = diff
-                            best_file, best_idx = vtt_file, idx
-                if best_file is not None and best_diff <= start_tolerance:
-                    caps = vtt_caps[best_file]
-                    if caps[best_idx].text.strip() != new_text:
-                        caps[best_idx].text = new_text
-                        modified_files.add(best_file)
-                    applied += 1
-                    found = True
+            try:
+                caption_idx = int(caption_idx_str)
+            except ValueError:
+                if debug:
+                    print(f"[DEBUG] Invalid captionIdx '{caption_idx_str}', skipping")
+                failed.append({
+                    "error": f"Invalid captionIdx: {caption_idx_str}",
+                    "change": change
+                })
+                continue
 
-            if not found:
-                unmatched.append({"start": change.get("start"), "end": change.get("end")})
+            # Locate the specific VTT file
+            vtt_path = vtt_dir / vtt_file
+            if not vtt_path.exists():
+                if debug:
+                    print(f"[DEBUG] VTT file not found: {vtt_path}")
+                failed.append({
+                    "error": f"VTT file not found: {vtt_file}",
+                    "change": change
+                })
+                continue
 
-        # Persist any modified VTT files
-        for vtt_file in modified_files:
-            vtt_caps[vtt_file].save(str(vtt_file))
+            try:
+                # Load the VTT file
+                captions = webvtt.read(str(vtt_path))
+                
+                # Validate caption index
+                if caption_idx < 0 or caption_idx >= len(captions):
+                    if debug:
+                        print(f"[DEBUG] Caption index {caption_idx} out of range (0-{len(captions)-1})")
+                    failed.append({
+                        "error": f"Caption index {caption_idx} out of range (0-{len(captions)-1})",
+                        "change": change
+                    })
+                    continue
 
-        return {"success": True, "message": f"Applied {applied}/{len(changes)} changes", "unmatched": unmatched}
+                # Update the specific caption
+                old_text = captions[caption_idx].text.strip()
+                if old_text != new_text:
+                    captions[caption_idx].text = new_text
+                    captions.save(str(vtt_path))
+                    modified_files.add(vtt_path)
+                    if debug:
+                        print(f"[DEBUG] Updated {vtt_file}[{caption_idx}]: '{old_text}' -> '{new_text}'")
+                else:
+                    if debug:
+                        print(f"[DEBUG] No change needed for {vtt_file}[{caption_idx}]")
+
+                applied += 1
+
+            except Exception as e:
+                if debug:
+                    print(f"[DEBUG] Error processing {vtt_file}: {e}")
+                failed.append({
+                    "error": f"Error processing {vtt_file}: {str(e)}",
+                    "change": change
+                })
+
+        result = {
+            "success": True,
+            "message": f"Applied {applied}/{len(changes)} changes to {len(modified_files)} VTT files"
+        }
+        
+        if failed:
+            result["failed"] = failed
+            if debug:
+                print(f"[DEBUG] {len(failed)} changes failed")
+
+        return result
+
     except Exception as e:
-        print(f"Error saving transcript edits: {e}")
+        if debug:
+            print(f"[DEBUG] Unexpected error: {e}")
         return {"success": False, "error": str(e)}
 
 
