@@ -1,10 +1,10 @@
 # Core dependencies
-pydub
-webvtt-py
-pyannote.audio
-huggingface_hub
-torch       # CPU-only by default
-faster-whisper
+pydub 0.25.1
+webvtt-py 0.5.1
+pyannote.audio 3.4.0
+huggingface_hub 0.35.3
+torch  2.8.0     # CPU-only by default
+faster-whisper 1.2.0
 
 # Web server dependencies (for enhanced progress tracking)
 fastapi
