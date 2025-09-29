@@ -273,7 +273,17 @@ SETUP_HTML = """
               window.location.href = '/';
             }, 2000);
           } else {
-            showStatus(`❌ ${result.error || 'Failed to save token. Please check your token and try again.'}`, 'error');
+            let errorMsg = result.error || 'Failed to save token. Please check your token and try again.';
+            
+            // Check if this is a model access issue
+            if (result.requires_license_acceptance || errorMsg.includes('access denied') || errorMsg.includes('license')) {
+              errorMsg += '<br><br><strong>📋 Action Required:</strong> You may need to accept the license agreements for the required AI models:<br>' +
+                         '• <a href="https://huggingface.co/pyannote/speaker-diarization" target="_blank">pyannote/speaker-diarization</a><br>' +
+                         '• <a href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank">pyannote/segmentation-3.0</a><br>' +
+                         'Visit each page, read the license, and click "Accept" if you agree.';
+            }
+            
+            showStatus(`❌ ${errorMsg}`, 'error');
           }
         } catch (error) {
           showStatus('❌ Network error. Please check your connection and try again.', 'error');
@@ -286,7 +296,7 @@ SETUP_HTML = """
       function showStatus(message, type) {
         const status = document.getElementById('status');
         status.className = `status ${type}`;
-        status.textContent = message;
+        status.innerHTML = message; // Use innerHTML to support HTML content like links
         status.style.display = 'block';
       }
       
@@ -344,6 +354,38 @@ async def save_token(request: Request):
 async def check_token():
     """Check if we have a valid token"""
     return {"has_token": _has_valid_token()}
+
+
+@app.post("/api/test-token")
+async def test_token(request: Request):
+    """Test a token without saving it - useful for testing different scenarios"""
+    try:
+        data = await request.json()
+        token = data.get("token", "").strip()
+        force_no_access = data.get("force_no_access", False)  # For testing
+        
+        if not token:
+            return {"success": False, "error": "No token provided"}
+        
+        # Special test scenarios
+        if force_no_access or token.startswith("hf_test_no_access"):
+            return {
+                "success": False,
+                "error": "Cannot access required models: pyannote/speaker-diarization (access denied - you may need to accept the license); pyannote/segmentation-3.0 (access denied - you may need to accept the license)",
+                "requires_license_acceptance": True
+            }
+        
+        # Validate the token
+        validation = _validate_hf_token(token)
+        return {
+            "success": validation["valid"],
+            "error": validation.get("error"),
+            "message": validation.get("message"),
+            "requires_license_acceptance": validation.get("requires_license_acceptance", False)
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": f"Failed to test token: {str(e)}"}
 
 
 @app.get("/api/job/{job_id}")
@@ -451,21 +493,59 @@ def _validate_hf_token(token: str) -> dict:
     if not token:
         return {"valid": False, "error": "Token is empty"}
     
+    if not token.startswith("hf_"):
+        return {"valid": False, "error": "Invalid token format. HuggingFace tokens start with 'hf_'"}
+    
     try:
         api = HfApi()
-        api.model_info("pyannote/speaker-diarization", token=token)
-        api.model_info("pyannote/segmentation-3.0", token=token)
-        return {"valid": True, "message": "Token validated successfully"}
+        
+        # Test basic API access first
+        try:
+            # This should work with any valid token
+            api.whoami(token=token)
+        except Exception as e:
+            return {"valid": False, "error": f"Invalid token or API access denied: {str(e)}"}
+        
+        # Test access to required models
+        required_models = [
+            "pyannote/speaker-diarization",
+            "pyannote/segmentation-3.0"
+        ]
+        
+        inaccessible_models = []
+        for model in required_models:
+            try:
+                api.model_info(model, token=token)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "not found" in error_msg or "repository not found" in error_msg:
+                    inaccessible_models.append(f"{model} (repository not found)")
+                elif "access" in error_msg or "forbidden" in error_msg or "401" in error_msg:
+                    inaccessible_models.append(f"{model} (access denied - you may need to accept the license)")
+                else:
+                    inaccessible_models.append(f"{model} (error: {str(e)})")
+        
+        if inaccessible_models:
+            error_details = "; ".join(inaccessible_models)
+            return {
+                "valid": False, 
+                "error": f"Cannot access required models: {error_details}",
+                "requires_license_acceptance": any("access denied" in model for model in inaccessible_models)
+            }
+        
+        return {"valid": True, "message": "Token validated successfully. All required models accessible."}
+        
     except Exception as e:
-        return {"valid": False, "error": f"Token validation failed: {str(e)}"}
+        return {"valid": False, "error": f"Unexpected validation error: {str(e)}"}
 
 def _has_valid_token() -> bool:
-    """Check if we have a valid stored token"""
+    """Check if a valid token exists (graceful version that doesn't crash)"""
     token = _get_hf_token()
     if not token:
         return False
+    
     result = _validate_hf_token(token)
-    return result["valid"]
+    return result.get("valid", False)
 
 
 @app.on_event("startup")
