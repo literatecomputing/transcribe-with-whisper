@@ -165,7 +165,7 @@ SETUP_HTML = """
       <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
       
       <div class=\"tip warning\">
-        <strong>Privacy Notice:</strong> Your token will be stored securely on this server only. It's never transmitted anywhere except to HuggingFace for authentication.
+        <strong>Privacy Notice:</strong> Your token will be stored securely on this computer only. 
       </div>
     </div>
 
@@ -182,8 +182,7 @@ SETUP_HTML = """
           <strong>Create a new token</strong> with these settings:
           <ul style=\"margin: 0.5rem 0; padding-left: 2rem;\">
             <li><strong>Name:</strong> MercuryScribe (or any name you prefer)</li>
-            <li><strong>Type:</strong> Read (default)</li>
-            <li><strong>No expiration</strong> (recommended) or set your preferred expiry</li>
+            <li><strong>Type:</strong> Read (Not the default: "Fine-grained")</li>
           </ul>
         </div>
         <div class=\"step\">
@@ -195,7 +194,7 @@ SETUP_HTML = """
       </div>
 
       <div class=\"tip\">
-        <strong>💡 Tip:</strong> Your token looks like <code>hf_AbCdEfGhIjKlMnOpQrStUvWxYz1234567890</code> - a mix of letters and numbers after "hf_"
+        <strong>💡 Tip:</strong> Your token looks like <code>hf_AbCdEfGhIjKlMnOpQrStUvWxYz</code> - a mix of upper/lowercase letters after "hf_"
       </div>
     </div>
 
