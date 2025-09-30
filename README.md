@@ -146,8 +146,8 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 **Linux/Mac (bash/zsh):**
 
 ```bash
+docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 docker run --rm -p 5001:5001 \
-   -e HUGGING_FACE_AUTH_TOKEN=$HUGGING_FACE_AUTH_TOKEN \
    -v "$(pwd)/transcription-files:/app/transcription-files" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
