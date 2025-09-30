@@ -17,9 +17,19 @@ Two ways to use this project:
 - MercuryScribe (Web UI)
 
   - Best for editing and reviewing in your browser
-  - Install: `pip install "transcribe-with-whisper[web]"`
+  - Programmer Install: `pip install "transcribe-with-whisper[web]"`
+  - Docker Install:
+
+  ```
+  docker run --rm -p 5001:5001 \
+   -v "$(pwd)/transcription-files:/app/transcription-files" \
+   ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
+  ```
+
   - Run: `mercuryscribe` then open http://localhost:5001
   - More: see `docs/README-mercuryscribe.md`
+
+  The web interface will walk you through getting an access token from Hugging Face (described more fully below).
 
 - transcribe-with-whisper (CLI)
   - Best for batch processing from the command line
@@ -27,29 +37,35 @@ Two ways to use this project:
   - Run: `transcribe-with-whisper yourfile.mp4 [Speaker1 Speaker2 ...]`
   - More: see `docs/README-transcribe-with-whisper.md`
 
-## What this does
+## What transcribe-with-whisper Does
 
 TL;DR: takes a video file, makes an HTML page that tracks the transcription with the playing video and makes video jump to text that you click. A `.docx` file with timestamps, which should be suitable for use with packages like MAXQDA is also created.
 
-There is a command-line Python version, best if you just want to process a bunch of files, and an interactive version that runs a web server on your computer and lets you edit the text and speakers in your web browser.
+## What mercuryScribe Does
+
+MercuryScribe is a web-based front end (the web server runs on your computer if you follow the instructions above) for transcribe-with-whisper. The server lets you make edits to the transcript in your web browser, and save them to the `.VTT` files that transcribe-with-whisper produced (and some software might find useful). You can then click a button to regenerate the HTML and DOCX files to pull those changes into updated HTML and DOCX files.
+
+## What does it look like?
+
+Well, there have been a few changes since this image was taken, but very much like this:
 
 ![NotebookLM Nonsense Demo](examples/notebooklm-nonsense.png)
 
+If you'd like to see a live demo (that does not allow you to save your changes), check this out!
+
 **[📺 View Live Demo](https://raw.githack.com/literatecomputing/transcribe-with-whisper/main/examples/notebooklm-nonsense.html)** - Interactive HTML transcription with synchronized video playback
 
-- Takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It should also work on audio-only files, though it may need some fairly simple modifications to do that.
+## Are there boring details that most people would rather not know about?
 
-- Separates who is speaking when (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model)
+Why yes! Here's what happens under the hood.
 
-https://huggingface.co/pyannote/segmentation-3.0
+- **Convert to a .wav file.** The script takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It also works for mp3 (and probably other audio formats).
 
-- Transcribes each speaker's speech using the [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) Python library
-- Produces an HTML file: you click on parts of the transcript, the video jumps to that moment
-- The HTML file and the original video file are required to view the transcription in a web browser
+- **Separate who is speaking when** (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model). This splits the file into multiple audio files that get deleted before you notice them.
 
-Faster-Whisper doesn't know about different speakers, so the code uses another model to split the transcript into pieces by speaker that are then handed off to Whisper.
+- **Do the Transcription** Transcribes each speaker's speech using the [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) Python library
 
-I can't find a good source what languages are supported, but something that seemed only mildly dubious claimed it was close to 100.
+- **Produces an HTML file**. The HTML file includes not only the text, but some Javascript that makes it possible to edit in your browser (but the mercurytScribe server is required to process those edits). You click on parts of the transcript, the video jumps to that moment so you can check the transcription, or jump to the parts you want to listen to. The original video file needs to be in the same folder/directory in order for the video to display in your browser.
 
 ---
 
@@ -157,8 +173,8 @@ docker run --rm -p 5001:5001 \
 If you can't figure out how to get Windows Terminal to run `bash`, this should work in PowerShell.
 
 ```powershell
+docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 docker run --rm -p 5001:5001 `
-   -e HUGGING_FACE_AUTH_TOKEN=$env:HUGGING_FACE_AUTH_TOKEN `
    -v "${PWD}/transcription-files:/app/transcription-files" `
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
