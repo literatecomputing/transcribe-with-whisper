@@ -719,6 +719,12 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
         import subprocess
         import threading
         
+        # Prepare environment with token
+        env = os.environ.copy()
+        token = _get_hf_token()
+        if token:
+            env["HUGGING_FACE_AUTH_TOKEN"] = token
+        
         proc = subprocess.Popen(
             cmd,
             cwd=str(TRANSCRIPTION_DIR),
@@ -726,7 +732,8 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
+            env=env
         )
         
         # Monitor output in real-time
@@ -793,7 +800,7 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
 @app.post("/upload")
 async def upload(file: UploadFile = File(...), speaker: Optional[List[str]] = Form(default=None)):
     global job_counter, jobs
-    if not os.getenv("HUGGING_FACE_AUTH_TOKEN"):
+    if not _get_hf_token():
         return PlainTextResponse(
             "HUGGING_FACE_AUTH_TOKEN not set. Set it when running the server.", status_code=500
         )
