@@ -22,7 +22,8 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Runtime env and directories (new default directory name)
 ENV TRANSCRIPTION_DIR=/app/transcription-files \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    WEB_SERVER_MODE=1
 RUN mkdir -p ${TRANSCRIPTION_DIR}
 
 # Expose FastAPI port
