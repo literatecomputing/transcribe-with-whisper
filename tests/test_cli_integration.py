@@ -25,7 +25,10 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
 
     # Run the CLI via module to avoid changing code
     cmd = [sys.executable, '-m', 'transcribe_with_whisper.main', EXAMPLES_AUDIO.name]
-    proc = subprocess.run(cmd, cwd=str(work), capture_output=True, text=True)
+    # Pass the environment including the HF token to the subprocess
+    env = os.environ.copy()
+    env['HUGGING_FACE_AUTH_TOKEN'] = token
+    proc = subprocess.run(cmd, cwd=str(work), capture_output=True, text=True, env=env)
     assert proc.returncode == 0, f"CLI failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
 
     basename = EXAMPLES_AUDIO.stem
