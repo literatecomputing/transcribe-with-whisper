@@ -95,6 +95,7 @@ def run_preflight():
 
 # Skip preflight checks in test environments, when explicitly disabled, or in web server mode
 if (not os.getenv("SKIP_PREFLIGHT_CHECKS") 
+    and not os.getenv("SKIP_HF_STARTUP_CHECK")  # Legacy support for tests
     and not os.getenv("PYTEST_CURRENT_TEST") 
     and not os.getenv("WEB_SERVER_MODE")):
     run_preflight()
