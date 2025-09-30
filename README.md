@@ -159,7 +159,7 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 
 #### Web User Interface
 
-**Linux/Mac (bash/zsh):**
+**Linux/Mac/WSL (bash/zsh):**
 
 ```bash
 docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
@@ -167,6 +167,8 @@ docker run --rm -p 5001:5001 \
    -v "$(pwd)/transcription-files:/app/transcription-files" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
+
+Once that's running, go to http://localhost:5001 and you should be on your way!
 
 **Windows (PowerShell):**
 
@@ -179,11 +181,7 @@ docker run --rm -p 5001:5001 `
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
-This command will get a newer Docker image if one is available (should work in all shells).
-
-```
-docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
-```
+Once that's running, go to http://localhost:5001 and you should be on your way!
 
 After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the transcription-files folder that is created in the folder/directory where you run the above command. Both HTML and DOCX files are automatically generated for each transcription.
 
