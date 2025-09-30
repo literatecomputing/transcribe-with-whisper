@@ -3,7 +3,6 @@ name: Build and Publish Docker Images (Multi-arch)
 on:
   workflow_dispatch: {}
   push:
-    branches: [main]
     tags: ["v*"]
 
 permissions:
