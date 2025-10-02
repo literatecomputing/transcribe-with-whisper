@@ -4,6 +4,10 @@ on:
   workflow_dispatch: {}
   push:
     tags: ["v*"]
+    branches:
+      - main
+      - 'fix-*'
+      - 'feature-*'
 
 permissions:
   contents: read
