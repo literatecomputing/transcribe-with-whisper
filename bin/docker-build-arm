@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+docker buildx build --platform linux/arm64 -f Dockerfile.cli -t transcribe-cli-arm64-test . --load 2>&1 | tee /tmp/arm64-build.log

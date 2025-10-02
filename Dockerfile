@@ -7,9 +7,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
         pandoc \
-        texlive-latex-recommended \
-        texlive-fonts-recommended \
-        texlive-latex-extra \
         build-essential \
         git \
         cmake \
@@ -37,8 +34,8 @@ COPY requirements.txt /app/requirements.txt
 # For ARM64: Build torchcodec from source since wheels aren't available
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building for ARM64 - installing PyTorch first, then torchcodec from source..."; \
-        pip install --no-cache-dir torch==2.8.0; \
+        echo "Building for ARM64 - installing PyTorch and pybind11 first, then torchcodec from source..."; \
+        pip install --no-cache-dir torch==2.8.0 pybind11; \
         BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
     fi \
     && pip install --no-cache-dir -r requirements.txt
