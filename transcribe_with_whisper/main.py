@@ -17,6 +17,8 @@ except Exception:
 
 warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
+warnings.filterwarnings("ignore", message=".*StreamingMediaDecoder has been deprecated.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.ffmpeg")
 
 def millisec(timeStr):
     spl = timeStr.split(":")

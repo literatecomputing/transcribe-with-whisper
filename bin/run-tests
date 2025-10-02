@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# Run tests for transcribe-with-whisper
+#
+# Usage:
+#   ./bin/run-tests              # Run all tests
+#   ./bin/run-tests -v           # Run with verbose output
+#   ./bin/run-tests -k test_name # Run specific test
+#   ./bin/run-tests --help       # Show pytest help
+
+set -euo pipefail
+
+# Get the script's directory and repository root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Change to repository root
+cd "$REPO_ROOT"
+
+echo "🧪 Running tests from: $REPO_ROOT"
+echo ""
+
+# Check if pytest is installed
+if ! command -v pytest &> /dev/null; then
+    echo "❌ pytest not found. Installing..."
+    pip install pytest pytest-cov
+fi
+
+# Run pytest with all arguments passed through
+# Use -v for verbose by default if no args provided
+if [ $# -eq 0 ]; then
+    exec pytest -v tests/
+else
+    exec pytest "$@" tests/
+fi
