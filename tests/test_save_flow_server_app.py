@@ -63,16 +63,3 @@ def test_save_single_edit_first_speaker_only(app_with_artifacts):
     # Re-read and assert update persisted for 0.vtt only
     nc0 = list(webvtt.read(str(v0)))
     assert nc0 and nc0[0].text.strip() == "edited-only-0"
-
-
-@pytest.mark.skip(reason="Reprocess requires a media file and full pipeline; enable when environment provides one.")
-def test_save_then_reprocess_regenerates_html_server_app(app_with_artifacts):
-    ctx = app_with_artifacts
-    client = ctx.client
-    v0 = ctx.vtt_dir / "0.vtt"
-    c0 = list(webvtt.read(str(v0)))
-    assert c0
-    changes = [{"start": c0[0].start, "end": c0[0].end, "speaker": "Speaker 1", "text": "after", "originalText": c0[0].text}]
-    resp = client.post(f"/save_transcript_edits/{ctx.basename}", json={"changes": changes})
-    assert resp.status_code == 200
-    assert True
