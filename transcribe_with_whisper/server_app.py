@@ -609,6 +609,9 @@ def _format_elapsed_time(start_time: float) -> str:
         return f"{minutes}m {seconds}s"
 
 
+
+
+
 def _update_progress_from_output(job_id: str, line: str):
     """Parse CLI output line and update job progress"""
     global jobs
@@ -654,16 +657,53 @@ def _update_progress_from_output(job_id: str, line: str):
         
         # Phase 4: Speaker diarization (25-50%) - Longest phase
         elif "DEMO_FILE" in line or "diarization" in line.lower():
-            jobs[job_id]["progress"] = 30
-            # Enhanced message with file duration and elapsed time
-            file_duration = jobs[job_id].get("file_duration", "Unknown duration")
-            start_time = jobs[job_id].get("start_time", time.time())
-            elapsed_time = time.time() - start_time
-            
-            duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
-            elapsed_str = _format_elapsed_time(elapsed_time)
-            
-            jobs[job_id]["message"] = f"Running speaker diarization AI on {duration_str} audio file... (elapsed: {elapsed_str})"
+            # Check for specific diarization progress steps
+            if "Diarization progress:" in line:
+                # Parse chunk progress like "processing chunk 50/200 (25%)"
+                if "processing chunk" in line and "/" in line:
+                    try:
+                        # Extract percentage from the message
+                        percent_match = re.search(r'\((\d+)%\)', line)
+                        if percent_match:
+                            chunk_percent = int(percent_match.group(1))
+                            # Map 0-100% chunk progress to 30-45% overall progress
+                            mapped_progress = 30 + (chunk_percent * 0.15)  # 15% of total progress
+                            jobs[job_id]["progress"] = min(int(mapped_progress), 45)
+                            jobs[job_id]["message"] = f"Speaker diarization: {chunk_percent}% complete..."
+                    except (ValueError, AttributeError):
+                        pass
+                else:
+                    # Step-level progress messages
+                    step_name = line.split("Diarization progress:")[-1].strip()
+                    # Map common steps to progress percentages
+                    step_progress_map = {
+                        "segmentation": 30,
+                        "speaker_embedding": 35,
+                        "embeddings": 40,
+                        "clustering": 45,
+                    }
+                    for keyword, progress in step_progress_map.items():
+                        if keyword in step_name.lower():
+                            jobs[job_id]["progress"] = progress
+                            jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
+                            break
+                    else:
+                        # Generic diarization progress
+                        current = jobs[job_id]["progress"]
+                        if current < 50:
+                            jobs[job_id]["progress"] = min(current + 2, 50)
+                            jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
+            else:
+                jobs[job_id]["progress"] = 30
+                # Enhanced message with file duration and elapsed time
+                file_duration = jobs[job_id].get("file_duration", "Unknown duration")
+                start_time = jobs[job_id].get("start_time", time.time())
+                elapsed_time = time.time() - start_time
+                
+                duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
+                elapsed_str = _format_elapsed_time(elapsed_time)
+                
+                jobs[job_id]["message"] = f"Running speaker diarization AI on {duration_str} audio file... (elapsed: {elapsed_str})"
         elif "Detected speakers:" in line:
             jobs[job_id]["progress"] = 50
             # Extract speaker information for better UX
@@ -674,13 +714,40 @@ def _update_progress_from_output(job_id: str, line: str):
                 jobs[job_id]["message"] = "Speaker diarization complete..."
         
         # Phase 5: Segment transcription (50-80%)
-        elif "Processing" in line and ".wav" in line:
-            # Increment progress for each segment being processed
-            current = jobs[job_id]["progress"]
-            jobs[job_id]["progress"] = min(current + 3, 80)
-            # Extract segment number if possible
-            segment_match = line.split("Processing ")[1].split(".wav")[0] if "Processing " in line else "segment"
-            jobs[job_id]["message"] = f"Transcribing audio segment {segment_match}..."
+        # Now we get real progress from "Transcribing segment X/Y" messages
+        elif "Transcribing segment" in line and "/" in line:
+            try:
+                # Extract current/total from "Transcribing segment 3/10: 0.wav"
+                segment_part = line.split("Transcribing segment")[1].strip()
+                current, total = segment_part.split(":")[0].split("/")
+                current_num = int(current.strip())
+                total_num = int(total.strip())
+                
+                # Map segment progress to 50-80% range
+                segment_progress = (current_num / total_num) * 100
+                mapped_progress = 50 + (segment_progress * 0.30)  # 30% of total progress
+                jobs[job_id]["progress"] = min(int(mapped_progress), 80)
+                jobs[job_id]["message"] = f"Transcribing segment {current_num}/{total_num}..."
+            except (ValueError, IndexError):
+                # Fallback if parsing fails
+                current = jobs[job_id]["progress"]
+                jobs[job_id]["progress"] = min(current + 2, 80)
+                jobs[job_id]["message"] = "Transcribing audio segments..."
+        
+        elif "Completed segment" in line and "/" in line:
+            try:
+                # Extract current/total from "Completed segment 3/10"
+                segment_part = line.split("Completed segment")[1].strip()
+                current, total = segment_part.split("/")
+                current_num = int(current.strip())
+                total_num = int(total.strip())
+                
+                # Map segment progress to 50-80% range
+                segment_progress = (current_num / total_num) * 100
+                mapped_progress = 50 + (segment_progress * 0.30)
+                jobs[job_id]["progress"] = min(int(mapped_progress), 80)
+            except (ValueError, IndexError):
+                pass
         
         # Phase 6: HTML generation (80-95%)
         elif "generate_html" in line or "Script completed successfully" in line:
@@ -709,6 +776,9 @@ def _update_progress_from_output(job_id: str, line: str):
 def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[str]]):
     global jobs
     try:
+        # Store basename for VTT progress tracking
+        basename = Path(filename).stem
+        jobs[job_id]["basename"] = basename
         jobs[job_id]["status"] = "running"
         jobs[job_id]["message"] = "Starting transcription..."
         jobs[job_id]["progress"] = 5

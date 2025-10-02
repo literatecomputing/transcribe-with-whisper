@@ -46,13 +46,24 @@ def get_diarization(inputWav, diarizationFile):
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token=auth_token)
 
     if not os.path.isfile(diarizationFile):
+        # Add progress hook to report diarization progress
+        def progress_hook(step_name=None, step_artifact=None, file=None, total=None, completed=None):
+            """Progress callback for diarization pipeline"""
+            if completed is not None and total is not None:
+                # This is chunk progress during inference
+                percent = int((completed / total) * 100) if total > 0 else 0
+                print(f"Diarization progress: processing chunk {completed}/{total} ({percent}%)", flush=True)
+            elif step_name:
+                # This is step-level progress
+                print(f"Diarization progress: {step_name}", flush=True)
+        
         if _HAS_TORCHAUDIO:
             # Load audio into memory for faster processing
             waveform, sample_rate = torchaudio.load(inputWav)
-            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate})
+            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate}, hook=progress_hook)
         else:
             # Fallback to file path if torchaudio is not available
-            dz = pipeline({"uri": "blabla", "audio": inputWav})
+            dz = pipeline({"uri": "blabla", "audio": inputWav}, hook=progress_hook)
         # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
         diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
         with open(diarizationFile, "w") as f:
@@ -89,14 +100,17 @@ def export_segments_audio(groups, inputWav, spacermilli=2000):
 
 def transcribe_segments(segment_files):
     model = WhisperModel("base", device="auto", compute_type="auto")
-    for f in segment_files:
+    total_segments = len(segment_files)
+    for idx, f in enumerate(segment_files, start=1):
         vtt_file = f"{Path(f).stem}.vtt"
         if not os.path.isfile(vtt_file):
+            print(f"Transcribing segment {idx}/{total_segments}: {f}", flush=True)
             segments, _ = model.transcribe(f, language="en")
             with open(vtt_file, "w", encoding="utf-8") as out:
                 out.write("WEBVTT\n\n")
                 for s in segments:
                     out.write(f"{format_time(s.start)} --> {format_time(s.end)}\n{s.text.strip()}\n\n")
+            print(f"Completed segment {idx}/{total_segments}", flush=True)
     return [f"{Path(f).stem}.vtt" for f in segment_files]
 
 def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermilli=2000):
