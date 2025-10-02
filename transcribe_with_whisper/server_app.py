@@ -400,6 +400,19 @@ async def progress_page(job_id: str):
         return PlainTextResponse("Job not found", status_code=404)
 
     job = jobs[job_id]
+    
+    # Format start time
+    start_time = job.get('start_time', time.time())
+    start_time_str = datetime.fromtimestamp(start_time).strftime("%I:%M:%S %p")
+    
+    # Format audio duration
+    file_duration = job.get('file_duration')
+    if file_duration and file_duration != "Unknown duration":
+        duration_minutes = file_duration / 60
+        duration_str = f"{duration_minutes:.1f} minutes"
+    else:
+        duration_str = "Unknown duration"
+    
     return HTMLResponse(f"""
 <!doctype html>
 <html>
@@ -417,8 +430,34 @@ async def progress_page(job_id: str):
       .status {{ margin: 1rem 0; }}
       .error {{ color: #dc3545; }}
       .success {{ color: #28a745; }}
+      .info {{ color: #666; font-size: 0.9rem; margin: 0.5rem 0; }}
+      .stats {{ background: #f8f9fa; padding: 0.75rem; border-radius: 6px; margin: 1rem 0; }}
+      .stats-row {{ display: flex; justify-content: space-between; margin: 0.25rem 0; }}
     </style>
     <script>
+      function formatTime(timestamp) {{
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString('en-US', {{ hour: 'numeric', minute: '2-digit', second: '2-digit' }});
+      }}
+      
+      function formatElapsed(seconds) {{
+        const mins = seconds / 60;
+        return mins.toFixed(1) + ' minutes';
+      }}
+      
+      function formatElapsedShort(seconds) {{
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        if (mins === 0) return secs + 's';
+        return mins + 'm ' + secs + 's';
+      }}
+      
+      function updateElapsedTime() {{
+        const now = Math.floor(Date.now() / 1000);
+        const elapsed = now - {start_time};
+        document.getElementById('elapsed-time').innerText = formatElapsed(elapsed);
+      }}
+      
       function updateProgress() {{
         fetch('/api/job/{job_id}')
           .then(response => response.json())
@@ -426,10 +465,23 @@ async def progress_page(job_id: str):
             document.getElementById('progress-fill').style.width = data.progress + '%';
             document.getElementById('progress-text').innerText = data.progress + '%';
             document.getElementById('status-message').innerText = data.message;
+            
+            // Update elapsed time
+            updateElapsedTime();
+            
             if (data.status === 'completed' && data.result) {{
               document.querySelector('.spinner').style.display = 'none';
+              
+              // Calculate and display completion stats
+              const endTime = data.end_time || Math.floor(Date.now() / 1000);
+              const elapsed = endTime - data.start_time;
+              
               document.getElementById('status-container').innerHTML = 
                 '<div class=\"success\">✅ Transcription completed! <a href=\"' + data.result + '\">View result</a></div>' +
+                '<div class=\"stats\">' +
+                '<div class=\"stats-row\"><strong>Completed at:</strong> <span>' + formatTime(endTime) + '</span></div>' +
+                '<div class=\"stats-row\"><strong>Total time:</strong> <span>' + formatElapsedShort(elapsed) + '</span></div>' +
+                '</div>' +
                 '<p><a href=\"/list\">View all files</a> | <a href=\"/\">Upload another file</a></p>';
             }} else if (data.status === 'error') {{
               document.querySelector('.spinner').style.display = 'none';
@@ -448,6 +500,11 @@ async def progress_page(job_id: str):
   <body>
     <div class=\"card\">
       <h1>Transcribing: {job['filename']}</h1>
+      <div class=\"stats\">
+        <div class=\"stats-row\"><strong>Started:</strong> <span>{start_time_str}</span></div>
+        <div class=\"stats-row\"><strong>Audio length:</strong> <span>{duration_str}</span></div>
+        <div class=\"stats-row\"><strong>Elapsed time:</strong> <span id=\"elapsed-time\">0s</span></div>
+      </div>
       <div class=\"progress-bar\">
         <div id=\"progress-fill\" class=\"progress-fill\" style=\"width: {job['progress']}%\"></div>
       </div>
@@ -457,7 +514,6 @@ async def progress_page(job_id: str):
         <span id=\"status-message\">{job['message']}</span>
       </div>
       <div id=\"status-container\"></div>
-      <p><small>This page will automatically update. Please don't close your browser.</small></p>
     </div>
   </body>
 </html>
@@ -860,8 +916,18 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
 
         jobs[job_id]["status"] = "completed"
         jobs[job_id]["progress"] = 100
-        jobs[job_id]["message"] = "Transcription completed!"
+        jobs[job_id]["end_time"] = time.time()
+        
+        # Calculate elapsed time for logging
+        elapsed = jobs[job_id]["end_time"] - jobs[job_id].get("start_time", jobs[job_id]["end_time"])
+        elapsed_str = _format_elapsed_time(jobs[job_id].get("start_time", jobs[job_id]["end_time"]))
+        end_time_str = datetime.fromtimestamp(jobs[job_id]["end_time"]).strftime("%I:%M:%S %p")
+        
+        jobs[job_id]["message"] = f"Transcription completed! (Finished at {end_time_str}, took {elapsed_str})"
         jobs[job_id]["result"] = f"/files/{html_out.name}"
+        
+        print(f"✅ Transcription completed at {end_time_str}")
+        print(f"⏱️  Total elapsed time: {elapsed_str}")
     except Exception as e:
         jobs[job_id]["status"] = "error"
         jobs[job_id]["message"] = f"Failed to run transcription: {e}"
