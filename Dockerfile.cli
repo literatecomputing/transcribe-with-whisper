@@ -26,9 +26,10 @@ ARG INSTALL_FROM=pypi
 
 # Use standard requirements.txt
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building for ARM64 - installing torchcodec from source..."; \
+        echo "Building for ARM64 - installing PyTorch first, then torchcodec from source..."; \
+        pip install --no-cache-dir torch==2.8.0; \
         pip install --no-cache-dir git+https://github.com/pytorch/torchcodec.git; \
     fi \
     && pip install --no-cache-dir -r /tmp/requirements.txt
