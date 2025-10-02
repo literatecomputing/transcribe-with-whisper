@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Iterable, List, Optional, Dict
 import json
+from contextlib import asynccontextmanager
 
 # Set web server mode to enable graceful startup without token
 os.environ["WEB_SERVER_MODE"] = "1"
@@ -74,7 +75,25 @@ TRANSCRIPTION_DIR = Path(
 )
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="MercuryScribe (Web)")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown events"""
+    # Startup
+    if os.getenv("SKIP_HF_STARTUP_CHECK") != "1":
+        if _has_valid_token():
+            print("✅ Hugging Face token found and validated.")
+        else:
+            print("⚠️  No valid Hugging Face token found. Users will be guided through setup.")
+    else:
+        print("⚠️  Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
+    
+    yield
+    
+    # Shutdown (nothing to clean up for now)
+
+
+app = FastAPI(title="MercuryScribe (Web)", lifespan=lifespan)
 app.mount("/files", StaticFiles(directory=str(TRANSCRIPTION_DIR)), name="files")
 
 # Simple in-memory job tracking
@@ -649,18 +668,6 @@ def _has_valid_token() -> bool:
     
     result = _validate_hf_token(token)
     return result.get("valid", False)
-
-
-@app.on_event("startup")
-def startup_check_token():
-    if os.getenv("SKIP_HF_STARTUP_CHECK") == "1":
-        print("⚠️  Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
-        return
-    
-    if _has_valid_token():
-        print("✅ Hugging Face token found and validated.")
-    else:
-        print("⚠️  No valid Hugging Face token found. Users will be guided through setup.")
 
 
 def _human_size(n: int) -> str:
