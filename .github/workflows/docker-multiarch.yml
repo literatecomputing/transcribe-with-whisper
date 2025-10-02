@@ -55,7 +55,7 @@ jobs:
           echo "Image: ${{ steps.img.outputs.image }}"
           echo "Dockerfile: ${{ matrix.file }}"
 
-      - name: Build and push (multi-arch)
+      - name: Build and push (multi-arch with ARM64 torchcodec from source)
         uses: docker/build-push-action@v6
         with:
           context: .
