@@ -69,10 +69,10 @@ def check_models(token):
     try:
         api = HfApi()
         # Make sure we can list the model
-        _ = api.model_info("pyannote/speaker-diarization", token=token)
-        print("✅ Hugging Face model 'pyannote/speaker-diarization' is accessible.")
+        _ = api.model_info("pyannote/speaker-diarization-community-1", token=token)
+        print("✅ Hugging Face model 'pyannote/speaker-diarization-community-1' is accessible.")
     except Exception as e:
-        print(f"❌ Could not access pyannote/speaker-diarization: {e}")
+        print(f"❌ Could not access pyannote/speaker-diarization-community-1: {e}")
         sys.exit(1)
 
 def run_preflight():
@@ -145,14 +145,16 @@ def transcribe_video(inputfile, speaker_names=None):
     if not auth_token:
         raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
 
-    pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization', use_auth_token=auth_token)
+    pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-community-1', token=auth_token)
     DEMO_FILE = {'uri': 'blabla', 'audio': inputWavCache}
 
     diarizationFile = f'{basename}-diarization.txt'
     if not os.path.isfile(diarizationFile):
         dz = pipeline(DEMO_FILE)
+        # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
+        diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
         with open(diarizationFile, "w") as text_file:
-            text_file.write(str(dz))
+            text_file.write(str(diarization))
 
     # Process speakers
     speakers = {}
