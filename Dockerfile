@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install ffmpeg and pandoc for audio/video processing and DOCX generation
+# Install system dependencies (including build tools for ARM64 torchcodec build)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -10,15 +10,33 @@ RUN apt-get update \
         texlive-latex-recommended \
         texlive-fonts-recommended \
         texlive-latex-extra \
+        build-essential \
+        git \
+        cmake \
+        pkg-config \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the project
-COPY . /app
+# Copy requirements first for better layer caching
+COPY requirements.txt /app/requirements.txt
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir -e . --no-deps
+# For ARM64: Build torchcodec from source since wheels aren't available
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && if [ "$(uname -m)" = "aarch64" ]; then \
+        echo "Building for ARM64 - installing torchcodec from source..."; \
+        pip install --no-cache-dir git+https://github.com/pytorch/torchcodec.git; \
+    fi \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the project
+COPY . /app
+
+# Install the project itself
+RUN pip install --no-cache-dir -e . --no-deps
 
 # Runtime env and directories (new default directory name)
 ENV TRANSCRIPTION_DIR=/app/transcription-files \
