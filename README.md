@@ -61,7 +61,7 @@ Why yes! Here's what happens under the hood.
 
 - **Convert to a .wav file.** The script takes a video file (.mp4, .mov, or .mkv) and creates an audio-only file (.wav) for Whisper to process. I think that only mp4 files are likely to display in your browser, but don't know right now. It also works for mp3 (and probably other audio formats).
 
-- **Separate who is speaking when** (speaker diarization using [pyannote/speaker-diarization](https://huggingface.co/pyannote/speaker-diarization), a free AI model). This splits the file into multiple audio files that get deleted before you notice them.
+- **Separate who is speaking when** (speaker diarization using [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1), a free AI model). This splits the file into multiple audio files that get deleted before you notice them.
 
 - **Do the Transcription** Transcribes each speaker's speech using the [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) Python library
 
@@ -98,9 +98,8 @@ On each model page linked below, click “Use this model” and select "pyannote
 
 #### Request Access for these Models!
 
-- Required: pyannote/speaker-diarization-3.1 → https://huggingface.co/pyannote/speaker-diarization-3.1
+- Required: pyannote/speaker-diarization-community-1 → https://huggingface.co/pyannote/speaker-diarization-community-1
 - Required: pyannote/segmentation-3.0 → https://huggingface.co/pyannote/segmentation-3.0
-- Required: https://huggingface.co/pyannote/speaker-diarization-community-1
 
 3. Create a read-access token
 

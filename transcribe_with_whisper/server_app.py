@@ -277,7 +277,7 @@ SETUP_HTML = """
             // Check if this is a model access issue
             if (result.requires_license_acceptance || errorMsg.includes('access denied') || errorMsg.includes('license')) {
               errorMsg += '<br><br><strong>📋 Action Required:</strong> You may need to accept the license agreements for the required AI models:<br>' +
-                         '• <a href="https://huggingface.co/pyannote/speaker-diarization" target="_blank">pyannote/speaker-diarization</a><br>' +
+                         '• <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank">pyannote/speaker-diarization-community-1</a><br>' +
                          '• <a href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank">pyannote/segmentation-3.0</a><br>' +
                          'Visit each page, read the license, and click "Accept" if you agree.';
             }
@@ -370,7 +370,7 @@ async def test_token(request: Request):
         if force_no_access or token.startswith("hf_test_no_access"):
             return {
                 "success": False,
-                "error": "Cannot access required models: pyannote/speaker-diarization (access denied - you may need to accept the license); pyannote/segmentation-3.0 (access denied - you may need to accept the license)",
+                "error": "Cannot access required models: pyannote/speaker-diarization-community-1 (access denied - you may need to accept the license); pyannote/segmentation-3.0 (access denied - you may need to accept the license)",
                 "requires_license_acceptance": True
             }
         
@@ -478,13 +478,13 @@ def _validate_hf_token_or_die() -> None:
         raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
     try:
         api = HfApi()
-        api.model_info("pyannote/speaker-diarization", token=token)
+        api.model_info("pyannote/speaker-diarization-community-1", token=token)
         api.model_info("pyannote/segmentation-3.0", token=token)
-        print("✅ Hugging Face token validated (speaker-diarization and segmentation-3.0 accessible).")
+        print("✅ Hugging Face token validated (speaker-diarization-community-1 and segmentation-3.0 accessible).")
     except Exception as e:
         raise RuntimeError(
             "Hugging Face token validation failed. Ensure the token is valid and has access to "
-            "'pyannote/speaker-diarization' and 'pyannote/segmentation-3.0'. Original error: " + str(e)
+            "'pyannote/speaker-diarization-community-1' and 'pyannote/segmentation-3.0'. Original error: " + str(e)
         )
 
 def _validate_hf_token(token: str) -> dict:
@@ -507,7 +507,7 @@ def _validate_hf_token(token: str) -> dict:
         
         # Test access to required models
         required_models = [
-            "pyannote/speaker-diarization",
+            "pyannote/speaker-diarization-community-1",
             "pyannote/segmentation-3.0"
         ]
         
