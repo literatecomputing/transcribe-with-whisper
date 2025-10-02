@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import argparse
 from pathlib import Path
 from pyannote.audio import Pipeline
 from pydub import AudioSegment
@@ -38,7 +39,7 @@ def create_spaced_audio(inputWav, outputWav, spacer_ms=2000):
     audio = spacer.append(audio, crossfade=0)
     audio.export(outputWav, format="wav")
 
-def get_diarization(inputWav, diarizationFile):
+def get_diarization(inputWav, diarizationFile, num_speakers=None, min_speakers=None, max_speakers=None):
     auth_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
     if not auth_token:
         raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
@@ -57,13 +58,27 @@ def get_diarization(inputWav, diarizationFile):
                 # This is step-level progress
                 print(f"Diarization progress: {step_name}", flush=True)
         
+        # Build pipeline parameters with speaker constraints
+        pipeline_params = {"hook": progress_hook}
+        
+        if num_speakers is not None:
+            pipeline_params["num_speakers"] = num_speakers
+            print(f"Using specified number of speakers: {num_speakers}")
+        elif min_speakers is not None or max_speakers is not None:
+            if min_speakers is not None:
+                pipeline_params["min_speakers"] = min_speakers
+                print(f"Using minimum speakers: {min_speakers}")
+            if max_speakers is not None:
+                pipeline_params["max_speakers"] = max_speakers
+                print(f"Using maximum speakers: {max_speakers}")
+        
         if _HAS_TORCHAUDIO:
             # Load audio into memory for faster processing
             waveform, sample_rate = torchaudio.load(inputWav)
-            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate}, hook=progress_hook)
+            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate}, **pipeline_params)
         else:
             # Fallback to file path if torchaudio is not available
-            dz = pipeline({"uri": "blabla", "audio": inputWav}, hook=progress_hook)
+            dz = pipeline({"uri": "blabla", "audio": inputWav}, **pipeline_params)
         # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
         diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
         with open(diarizationFile, "w") as f:
@@ -768,7 +783,7 @@ def discover_speakers_from_groups(groups):
         speakers_found.add(speaker)
     return sorted(list(speakers_found))
 
-def transcribe_video(inputfile, speaker_names=None):
+def transcribe_video(inputfile, speaker_names=None, num_speakers=None, min_speakers=None, max_speakers=None):
     basename = Path(inputfile).stem
     workdir = basename
     Path(workdir).mkdir(exist_ok=True)
@@ -781,7 +796,7 @@ def transcribe_video(inputfile, speaker_names=None):
     create_spaced_audio(inputWavCache, outputWav)
 
     diarizationFile = f"{basename}-diarization.txt"
-    dzs = get_diarization(outputWav, diarizationFile)
+    dzs = get_diarization(outputWav, diarizationFile, num_speakers, min_speakers, max_speakers)
     groups = group_segments(dzs)
 
     segment_files = export_segments_audio(groups, outputWav)
@@ -843,21 +858,68 @@ def transcribe_video(inputfile, speaker_names=None):
     print(f"Script completed successfully! Output: ../{basename}.html")
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: whisper-transcribe <video_file> [speaker_names...]")
+    parser = argparse.ArgumentParser(
+        description='Transcribe video/audio with speaker diarization',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Basic transcription
+  %(prog)s video.mp4
+  
+  # With speaker names
+  %(prog)s video.mp4 "Alice" "Bob"
+  
+  # Specify exact number of speakers (improves accuracy)
+  %(prog)s video.mp4 --num-speakers 2
+  
+  # Specify speaker range
+  %(prog)s video.mp4 --min-speakers 2 --max-speakers 4
+  
+  # Combine speaker names with constraints
+  %(prog)s video.mp4 --num-speakers 2 "Alice" "Bob"
+        '''
+    )
+    
+    parser.add_argument('video_file', help='Video or audio file to transcribe')
+    parser.add_argument('speaker_names', nargs='*', help='Optional speaker names (e.g., "Alice" "Bob")')
+    parser.add_argument('--num-speakers', type=int, metavar='N',
+                        help='Exact number of speakers (improves diarization accuracy)')
+    parser.add_argument('--min-speakers', type=int, metavar='N',
+                        help='Minimum number of speakers')
+    parser.add_argument('--max-speakers', type=int, metavar='N',
+                        help='Maximum number of speakers')
+    
+    args = parser.parse_args()
+    
+    # Validate speaker constraints
+    if args.num_speakers is not None and (args.min_speakers is not None or args.max_speakers is not None):
+        print("Error: Cannot use --num-speakers with --min-speakers or --max-speakers")
         sys.exit(1)
+    
+    if args.num_speakers is not None and args.num_speakers < 1:
+        print("Error: --num-speakers must be at least 1")
+        sys.exit(1)
+    
+    if args.min_speakers is not None and args.min_speakers < 1:
+        print("Error: --min-speakers must be at least 1")
+        sys.exit(1)
+    
+    if args.max_speakers is not None and args.max_speakers < 1:
+        print("Error: --max-speakers must be at least 1")
+        sys.exit(1)
+    
+    if args.min_speakers is not None and args.max_speakers is not None:
+        if args.min_speakers > args.max_speakers:
+            print("Error: --min-speakers cannot be greater than --max-speakers")
+            sys.exit(1)
 
-    inputfile = sys.argv[1]
-    speaker_names = sys.argv[2:]  # any extra args are speaker names
-
-    # Default speaker labels
-    default_speakers = ["Speaker 1", "Speaker 2", "Speaker 3", "Speaker 4", "Speaker 5", "Speaker 6"]
-
-    # If user provides names, override defaults
-    for i, name in enumerate(speaker_names):
-        if i < len(default_speakers):
-            default_speakers[i] = name
-    transcribe_video(inputfile, default_speakers)    
+    transcribe_video(
+        args.video_file, 
+        args.speaker_names if args.speaker_names else None,
+        args.num_speakers,
+        args.min_speakers,
+        args.max_speakers
+    )    
 
 
 if __name__ == "__main__":

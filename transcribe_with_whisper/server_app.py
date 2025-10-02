@@ -97,10 +97,13 @@ INDEX_HTML = """
       input[type=file] { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; }
       .row { display: flex; gap: 0.5rem; align-items: center; }
       .row input[type=text] { flex: 1; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; }
+      .row input[type=number] { width: 80px; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; }
+      .row label { min-width: 120px; }
       button { background: #0d6efd; color: white; border: 0; padding: 0.6rem 1rem; border-radius: 6px; cursor: pointer; }
       button:disabled { opacity: .6; cursor: progress; }
       .tip { color: #555; font-size: .95rem; }
       code { background: #f6f8fa; padding: .1rem .3rem; border-radius: 4px; }
+      .help-text { color: #666; font-size: 0.85rem; margin-top: 0.25rem; }
     </style>
   </head>
   <body>
@@ -108,16 +111,40 @@ INDEX_HTML = """
       <h1>MercuryScribe</h1>
       <p class=\"tip\">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
       <p class=\"tip\">Manage or edit files in <code>./transcription-files</code> or use the list view: <a href=\"/list\">Browse transcription-files</a>.</p>
-      <p class=\"tip\">Set <code>HUGGING_FACE_AUTH_TOKEN</code> in your environment before starting.</p>
       <form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\" onsubmit=\"document.getElementById('submit').disabled = true; document.getElementById('submit').innerText='Processing…';\">
         <input type=\"file\" name=\"file\" accept=\"video/*,audio/*\" required>
+        
         <details>
-          <summary>Optional: Speaker names</summary>
-          <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 1\"></div>
-          <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 2\"></div>
-          <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 3\"></div>
-          <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 4\"></div>
+          <summary>🎙️ Speaker Configuration (Optional - improves accuracy)</summary>
+          <div style=\"padding: 0.5rem 0;\">
+            <div class=\"row\">
+              <label for=\"num-speakers\">Number of speakers:</label>
+              <input type=\"number\" id=\"num-speakers\" name=\"num_speakers\" min=\"1\" max=\"20\" placeholder=\"Auto\">
+            </div>
+            <div class=\"help-text\">If you know the exact number of speakers, enter it here for better accuracy. Leave blank for automatic detection.</div>
+            
+            <div class=\"row\" style=\"margin-top: 0.75rem;\">
+              <label for=\"min-speakers\">Min speakers:</label>
+              <input type=\"number\" id=\"min-speakers\" name=\"min_speakers\" min=\"1\" max=\"20\" placeholder=\"Auto\">
+            </div>
+            <div class=\"row\">
+              <label for=\"max-speakers\">Max speakers:</label>
+              <input type=\"number\" id=\"max-speakers\" name=\"max_speakers\" min=\"1\" max=\"20\" placeholder=\"Auto\">
+            </div>
+            <div class=\"help-text\">Or specify a range if you're unsure of the exact number.</div>
+          </div>
         </details>
+        
+        <details>
+          <summary>👥 Speaker Names (Optional)</summary>
+          <div style=\"padding: 0.5rem 0;\">
+            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 1\"></div>
+            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 2\"></div>
+            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 3\"></div>
+            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 4\"></div>
+          </div>
+        </details>
+        
         <button id=\"submit\" type=\"submit\">Transcribe</button>
       </form>
     </div>
@@ -520,11 +547,32 @@ async def progress_page(job_id: str):
 """)
 
 
-def _build_cli_cmd(filename: str, speakers: Optional[List[str]] = None) -> List[str]:
+def _build_cli_cmd(
+    filename: str, 
+    speakers: Optional[List[str]] = None,
+    num_speakers: Optional[int] = None,
+    min_speakers: Optional[int] = None,
+    max_speakers: Optional[int] = None
+) -> List[str]:
     """Use the python -m entry to invoke CLI installed from this same package."""
-    cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main", filename]
+    cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main"]
+    
+    # Add speaker constraint flags
+    if num_speakers is not None:
+        cmd.extend(["--num-speakers", str(num_speakers)])
+    elif min_speakers is not None or max_speakers is not None:
+        if min_speakers is not None:
+            cmd.extend(["--min-speakers", str(min_speakers)])
+        if max_speakers is not None:
+            cmd.extend(["--max-speakers", str(max_speakers)])
+    
+    # Add filename
+    cmd.append(filename)
+    
+    # Add speaker names
     if speakers:
         cmd.extend(speakers)
+    
     return cmd
 
 
@@ -829,7 +877,14 @@ def _update_progress_from_output(job_id: str, line: str):
         pass
 
 
-def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[str]]):
+def _run_transcription_job(
+    job_id: str, 
+    filename: str, 
+    speakers: Optional[List[str]],
+    num_speakers: Optional[int] = None,
+    min_speakers: Optional[int] = None,
+    max_speakers: Optional[int] = None
+):
     global jobs
     try:
         # Store basename for VTT progress tracking
@@ -839,7 +894,7 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
         jobs[job_id]["message"] = "Starting transcription..."
         jobs[job_id]["progress"] = 5
 
-        cmd = _build_cli_cmd(filename, speakers or None)
+        cmd = _build_cli_cmd(filename, speakers or None, num_speakers, min_speakers, max_speakers)
         
         # Use Popen for real-time output monitoring
         import subprocess
@@ -934,7 +989,13 @@ def _run_transcription_job(job_id: str, filename: str, speakers: Optional[List[s
 
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...), speaker: Optional[List[str]] = Form(default=None)):
+async def upload(
+    file: UploadFile = File(...), 
+    speaker: Optional[List[str]] = Form(default=None),
+    num_speakers: Optional[str] = Form(default=None),
+    min_speakers: Optional[str] = Form(default=None),
+    max_speakers: Optional[str] = Form(default=None)
+):
     global job_counter, jobs
     if not _get_hf_token():
         return PlainTextResponse(
@@ -948,6 +1009,21 @@ async def upload(file: UploadFile = File(...), speaker: Optional[List[str]] = Fo
     job_counter += 1
     job_id = str(job_counter)
     speakers = [s.strip() for s in (speaker or []) if s and s.strip()]
+    
+    # Parse and validate speaker constraints (handle empty strings from form)
+    num_speakers_int = None
+    min_speakers_int = None
+    max_speakers_int = None
+    
+    try:
+        if num_speakers and num_speakers.strip():
+            num_speakers_int = int(num_speakers)
+        if min_speakers and min_speakers.strip():
+            min_speakers_int = int(min_speakers)
+        if max_speakers and max_speakers.strip():
+            max_speakers_int = int(max_speakers)
+    except ValueError as e:
+        return PlainTextResponse(f"Invalid speaker number: {e}", status_code=400)
 
     # Get audio duration for progress feedback
     file_duration = _get_audio_duration(dest_path)
@@ -961,7 +1037,10 @@ async def upload(file: UploadFile = File(...), speaker: Optional[List[str]] = Fo
         "file_duration": file_duration,
     }
 
-    thread = threading.Thread(target=_run_transcription_job, args=(job_id, file.filename, speakers))
+    thread = threading.Thread(
+        target=_run_transcription_job, 
+        args=(job_id, file.filename, speakers, num_speakers_int, min_speakers_int, max_speakers_int)
+    )
     thread.daemon = True
     thread.start()
 
@@ -1059,7 +1138,10 @@ async def rerun(filename: str = Form(...)):
         "file_duration": file_duration,
     }
 
-    thread = threading.Thread(target=_run_transcription_job, args=(job_id, target.name, None))
+    thread = threading.Thread(
+        target=_run_transcription_job, 
+        args=(job_id, target.name, None, None, None, None)
+    )
     thread.daemon = True
     thread.start()
 
