@@ -27,7 +27,8 @@ COPY requirements.txt /app/requirements.txt
 # For ARM64: Build torchcodec from source since wheels aren't available
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building for ARM64 - installing torchcodec from source..."; \
+        echo "Building for ARM64 - installing PyTorch first, then torchcodec from source..."; \
+        pip install --no-cache-dir torch==2.8.0; \
         pip install --no-cache-dir git+https://github.com/pytorch/torchcodec.git; \
     fi \
     && pip install --no-cache-dir -r requirements.txt
