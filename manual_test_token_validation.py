@@ -120,7 +120,8 @@ if __name__ == "__main__":
     # Check if server is running
     if not check_server_status():
         print("\n💡 Start the server first:")
-        print("   python3 transcribe_with_whisper/web_server.py")
+        print("   mercuryscribe")
+        print("   # or: python3 -m transcribe_with_whisper.server_app")
         exit(1)
     
     # Run invalid token tests
