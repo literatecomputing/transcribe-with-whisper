@@ -20,8 +20,8 @@ def make_app_with_temp_dir(tmpdir: Path):
     return mod.app
 
 
-@pytest.mark.xfail(reason="Endpoint calls undefined _regenerate_html_from_vtt; pending fix in app code", strict=False)
 def test_api_save_transcript_writes_vtts(tmp_path: Path):
+    """Test that /api/save-transcript endpoint saves segments to VTT files"""
     app = make_app_with_temp_dir(tmp_path)
     client = TestClient(app)
 
