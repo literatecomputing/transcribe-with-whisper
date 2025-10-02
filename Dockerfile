@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies (including build tools for ARM64 torchcodec build)
+# Install system dependencies (including full dev tools for ARM64 torchcodec build)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -14,10 +14,20 @@ RUN apt-get update \
         git \
         cmake \
         pkg-config \
+        ninja-build \
         libavcodec-dev \
         libavformat-dev \
         libavutil-dev \
         libswscale-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libswresample-dev \
+        libpostproc-dev \
+        yasm \
+        nasm \
+        autoconf \
+        automake \
+        libtool \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better layer caching
