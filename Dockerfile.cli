@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && if [ "$(uname -m)" = "aarch64" ]; then \
         echo "Building for ARM64 - installing PyTorch first, then torchcodec from source..."; \
         pip install --no-cache-dir torch==2.8.0; \
-        pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
+        BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
     fi \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
