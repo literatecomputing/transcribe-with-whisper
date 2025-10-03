@@ -1,0 +1,13 @@
+# Core dependencies for AMD64 (x86_64)
+# Uses pyannote.audio 4.0.0 with torchcodec support
+pydub==0.25.1
+webvtt-py==0.5.1
+pyannote.audio==4.0.0
+huggingface_hub==0.35.3
+torch==2.8.0     # CPU-only by default
+faster-whisper==1.2.0
+
+# Web server dependencies (for enhanced progress tracking)
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+python-multipart==0.0.20

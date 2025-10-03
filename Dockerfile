@@ -30,23 +30,19 @@ RUN python3.11 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements first for better layer caching
-COPY requirements.txt /app/requirements.txt
+COPY requirements-amd64.txt requirements-arm64.txt /app/
 
 # Install Python dependencies
-# For ARM64: Install PyTorch first, then attempt torchcodec from source
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# ARM64-specific: Build torchcodec from source
+# Install architecture-specific requirements
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building for ARM64 - installing PyTorch from PyPI (has aarch64 wheels)..."; \
-        pip install --no-cache-dir torch==2.8.0 torchvision torchaudio; \
-        echo "Building torchcodec from source..."; \
-        pip install --no-cache-dir pybind11 numpy; \
-        BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
+        echo "=== Building for ARM64 - using pyannote.audio 3.4.0 (no torchcodec required) ==="; \
+        pip install --no-cache-dir -r requirements-arm64.txt; \
+    else \
+        echo "=== Building for AMD64 - using pyannote.audio 4.0.0 (with torchcodec) ==="; \
+        pip install --no-cache-dir -r requirements-amd64.txt; \
     fi
-
-# Install main requirements
-RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the project
 COPY . /app
