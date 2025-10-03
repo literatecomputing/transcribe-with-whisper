@@ -1,0 +1,13 @@
+# Core dependencies for ARM64 (aarch64)
+# Uses pyannote.audio 3.4.0 which doesn't require torchcodec
+pydub==0.25.1
+webvtt-py==0.5.1
+pyannote.audio==3.4.0
+huggingface_hub==0.35.3
+torch==2.8.0     # CPU-only by default
+faster-whisper==1.2.0
+
+# Web server dependencies (for enhanced progress tracking)
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+python-multipart==0.0.20

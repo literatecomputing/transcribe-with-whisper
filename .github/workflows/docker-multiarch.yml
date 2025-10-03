@@ -6,8 +6,8 @@ on:
     tags: ["v*"]
     branches:
       - main
-      - 'fix-*'
-      - 'feature-*'
+      - "fix-*"
+      - "feature-*"
 
 permissions:
   contents: read
@@ -103,12 +103,12 @@ jobs:
         run: |
           REPO_NAME=${GITHUB_REPOSITORY#*/}
           IMAGE=ghcr.io/${{ github.repository_owner }}/${REPO_NAME}-${{ matrix.suffix }}
-          
+
           # Create manifest for latest
           docker buildx imagetools create -t ${IMAGE}:latest \
             ${IMAGE}:latest-amd64 \
             ${IMAGE}:latest-arm64
-          
+
           # Create manifest for SHA
           docker buildx imagetools create -t ${IMAGE}:${{ github.sha }} \
             ${IMAGE}:${{ github.sha }}-amd64 \
