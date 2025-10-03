@@ -1,26 +1,56 @@
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
 WORKDIR /app
 
-# Install ffmpeg and pandoc for audio/video processing and DOCX generation
+# Install system dependencies including Python
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-venv \
+        python3-pip \
         ffmpeg \
         pandoc \
-        texlive-latex-recommended \
-        texlive-fonts-recommended \
-        texlive-latex-extra \
+        build-essential \
+        git \
+        cmake \
+        ninja-build \
+        pkg-config \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libswscale-dev \
+        libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the project
-COPY . /app
+# Create Python virtual environment
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements first for better layer caching
+COPY requirements-amd64.txt requirements-arm64.txt /app/
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir -e . --no-deps
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Runtime env and directories (new default directory name)
+# Install architecture-specific requirements
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        echo "=== Building for ARM64 - using pyannote.audio 3.4.0 (no torchcodec required) ==="; \
+        pip install --no-cache-dir -r requirements-arm64.txt; \
+    else \
+        echo "=== Building for AMD64 - using pyannote.audio 4.0.0 (with torchcodec) ==="; \
+        pip install --no-cache-dir -r requirements-amd64.txt; \
+    fi
+
+# Copy the rest of the project
+COPY . /app
+
+# Install the project itself
+RUN pip install --no-cache-dir -e . --no-deps
+
+# Runtime env and directories
 ENV TRANSCRIPTION_DIR=/app/transcription-files \
     PYTHONUNBUFFERED=1 \
     WEB_SERVER_MODE=1
