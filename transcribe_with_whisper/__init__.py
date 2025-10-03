@@ -112,8 +112,8 @@ import re
 
 # Check pyannote.audio version for API compatibility
 try:
-    import pkg_resources
-    _PYANNOTE_VERSION = pkg_resources.get_distribution("pyannote.audio").version
+    import pyannote.audio
+    _PYANNOTE_VERSION = pyannote.audio.__version__
     _PYANNOTE_MAJOR = int(_PYANNOTE_VERSION.split('.')[0])
 except Exception:
     # Fallback: assume version 4.x if import fails

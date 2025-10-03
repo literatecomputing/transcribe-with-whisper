@@ -11,8 +11,8 @@
 set -euo pipefail
 
 # Get the script's directory and repository root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" )
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." )
 
 # Change to repository root
 cd "$REPO_ROOT"
