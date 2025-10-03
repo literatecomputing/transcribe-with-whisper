@@ -1,31 +1,18 @@
-FROM python:3.11-slim
+FROM continuumio/miniconda3:latest
 
 WORKDIR /app
 
-# Install ffmpeg, pandoc, and full dev deps for ARM64 torchcodec build
+# Install ffmpeg, pandoc, and basic build tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg \
         pandoc \
         build-essential \
         git \
-        cmake \
-        pkg-config \
-        ninja-build \
-        libavcodec-dev \
-        libavformat-dev \
-        libavutil-dev \
-        libswscale-dev \
-        libavdevice-dev \
-        libavfilter-dev \
-        libswresample-dev \
-        libpostproc-dev \
-        yasm \
-        nasm \
-        autoconf \
-        automake \
-        libtool \
     && rm -rf /var/lib/apt/lists/*
+
+# Initialize conda for shell
+RUN conda init bash
 
 # Install the package from PyPI by default; fallback to local copy if you build in-repo
 # Set this ARG at build time to switch sources: --build-arg INSTALL_FROM=local
@@ -33,26 +20,39 @@ ARG INSTALL_FROM=pypi
 
 # Use standard requirements.txt
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+
+# Create conda environment and install dependencies
+RUN conda create -n transcribe python=3.11 -y \
+    && . /opt/conda/etc/profile.d/conda.sh \
+    && conda activate transcribe \
     && if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "Building for ARM64 - installing PyTorch and pybind11 first, then torchcodec from source..."; \
-        pip install --no-cache-dir torch==2.8.0 pybind11; \
+        echo "Building for ARM64 - installing PyTorch via conda, cmake, ninja..."; \
+        conda install -y pytorch -c pytorch-nightly cmake ninja pybind11; \
         BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
+    else \
+        echo "Building for AMD64 - using pip for all packages"; \
+        pip install --no-cache-dir --upgrade pip setuptools wheel; \
     fi \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Install console package (pypi or local)
 COPY . /app
-RUN if [ "$INSTALL_FROM" = "local" ]; then \
+RUN . /opt/conda/etc/profile.d/conda.sh \
+    && conda activate transcribe \
+    && if [ "$INSTALL_FROM" = "local" ]; then \
         pip install --no-cache-dir . ; \
     else \
         pip install --no-cache-dir transcribe-with-whisper ; \
     fi
 
+# Set PATH to use conda environment
+ENV PATH=/opt/conda/envs/transcribe/bin:$PATH
+
 # Create a mount point for user files
 VOLUME ["/data"]
 WORKDIR /data
 
-# Default entrypoint runs the CLI; you can override at runtime
-ENTRYPOINT ["transcribe-with-whisper"]
+# Default entrypoint runs the CLI with conda environment
+SHELL ["/bin/bash", "-c"]
+ENTRYPOINT ["/bin/bash", "-c", ". /opt/conda/etc/profile.d/conda.sh && conda activate transcribe && transcribe-with-whisper \"$@\"", "--"]
 CMD ["--help"]
