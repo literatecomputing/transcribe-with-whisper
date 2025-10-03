@@ -16,6 +16,13 @@ RUN apt-get update \
         cmake \
         ninja-build \
         pkg-config \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libswscale-dev \
+        libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create Python virtual environment
@@ -34,8 +41,8 @@ RUN if [ "$(uname -m)" = "aarch64" ]; then \
         echo "Building for ARM64 - installing PyTorch first..."; \
         pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; \
         echo "Attempting to build torchcodec from source..."; \
-        pip install --no-cache-dir pybind11; \
-        (BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git && echo "SUCCESS: torchcodec built!") || echo "WARNING: torchcodec build failed, will be installed by requirements.txt if available"; \
+        pip install --no-cache-dir pybind11 numpy; \
+        BUILD_AGAINST_ALL_FFMPEG_FROM_S3=1 pip install --no-cache-dir --no-build-isolation git+https://github.com/pytorch/torchcodec.git; \
     fi
 
 # Install main requirements
