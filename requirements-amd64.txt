@@ -1,6 +1,5 @@
-# Core dependencies
-# NOTE: pyannote.audio 4.0.0 requires torchcodec which is not available for ARM64/aarch64
-# For Docker builds on ARM64, use requirements-docker.txt which uses pyannote.audio 3.4.0
+# Core dependencies for AMD64 (x86_64)
+# Uses pyannote.audio 4.0.0 with torchcodec support
 pydub==0.25.1
 webvtt-py==0.5.1
 pyannote.audio==4.0.0

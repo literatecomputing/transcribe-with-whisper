@@ -1,24 +1,51 @@
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
 WORKDIR /app
 
-# Install ffmpeg, pandoc and runtime deps
+# Install system dependencies including Python
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-venv \
+        python3-pip \
         ffmpeg \
         pandoc \
-        texlive-latex-recommended \
-        texlive-fonts-recommended \
-        texlive-latex-extra \
+        build-essential \
+        git \
+        cmake \
+        ninja-build \
+        pkg-config \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libswscale-dev \
+        libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Create Python virtual environment
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 # Install the package from PyPI by default; fallback to local copy if you build in-repo
-# Set this ARG at build time to switch sources: --build-arg INSTALL_FROM=local
 ARG INSTALL_FROM=pypi
 
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+# Copy architecture-specific requirements
+COPY requirements-amd64.txt requirements-arm64.txt /tmp/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install architecture-specific requirements
+RUN if [ "$(uname -m)" = "aarch64" ]; then \
+        echo "=== Building for ARM64 - using pyannote.audio 3.4.0 (no torchcodec required) ==="; \
+        pip install --no-cache-dir -r /tmp/requirements-arm64.txt; \
+    else \
+        echo "=== Building for AMD64 - using pyannote.audio 4.0.0 (with torchcodec) ==="; \
+        pip install --no-cache-dir -r /tmp/requirements-amd64.txt; \
+    fi
 
 # Install console package (pypi or local)
 COPY . /app
@@ -32,6 +59,6 @@ RUN if [ "$INSTALL_FROM" = "local" ]; then \
 VOLUME ["/data"]
 WORKDIR /data
 
-# Default entrypoint runs the CLI; you can override at runtime
+# Default entrypoint runs the CLI
 ENTRYPOINT ["transcribe-with-whisper"]
 CMD ["--help"]

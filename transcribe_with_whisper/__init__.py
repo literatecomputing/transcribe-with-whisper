@@ -110,6 +110,15 @@ import webvtt
 import subprocess
 import re
 
+# Check pyannote.audio version for API compatibility
+try:
+    import pyannote.audio
+    _PYANNOTE_VERSION = pyannote.audio.__version__
+    _PYANNOTE_MAJOR = int(_PYANNOTE_VERSION.split('.')[0])
+except Exception:
+    # Fallback: assume version 4.x if import fails
+    _PYANNOTE_MAJOR = 4
+
 
 def millisec(timeStr):
     spl = timeStr.split(":")
@@ -145,7 +154,13 @@ def transcribe_video(inputfile, speaker_names=None):
     if not auth_token:
         raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
 
-    pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-community-1', token=auth_token)
+    # Use appropriate API based on pyannote.audio version
+    if _PYANNOTE_MAJOR >= 4:
+        # pyannote.audio 4.0.0+ API
+        pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-community-1', token=auth_token)
+    else:
+        # pyannote.audio 3.x API
+        pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', use_auth_token=auth_token)
     DEMO_FILE = {'uri': 'blabla', 'audio': inputWavCache}
 
     diarizationFile = f'{basename}-diarization.txt'

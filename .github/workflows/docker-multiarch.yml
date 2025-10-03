@@ -4,6 +4,10 @@ on:
   workflow_dispatch: {}
   push:
     tags: ["v*"]
+    branches:
+      - main
+      - "fix-*"
+      - "feature-*"
 
 permissions:
   contents: read
@@ -15,7 +19,7 @@ concurrency:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -23,16 +27,27 @@ jobs:
           - name: web
             file: Dockerfile
             suffix: web
+            arch: amd64
+            platform: linux/amd64
+          - name: web
+            file: Dockerfile
+            suffix: web
+            arch: arm64
+            platform: linux/arm64
           - name: cli
             file: Dockerfile.cli
             suffix: cli
+            arch: amd64
+            platform: linux/amd64
+          - name: cli
+            file: Dockerfile.cli
+            suffix: cli
+            arch: arm64
+            platform: linux/arm64
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -54,16 +69,47 @@ jobs:
         run: |
           echo "Image: ${{ steps.img.outputs.image }}"
           echo "Dockerfile: ${{ matrix.file }}"
+          echo "Architecture: ${{ matrix.arch }}"
+          echo "Platform: ${{ matrix.platform }}"
 
-      - name: Build and push (multi-arch)
+      - name: Build and push (${{ matrix.arch }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ${{ steps.img.outputs.image }}:latest
-            ${{ steps.img.outputs.image }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ steps.img.outputs.image }}:latest-${{ matrix.arch }}
+            ${{ steps.img.outputs.image }}:${{ github.sha }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.suffix }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.suffix }}-${{ matrix.arch }}
+
+  create-manifest:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        suffix: [web, cli]
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          REPO_NAME=${GITHUB_REPOSITORY#*/}
+          IMAGE=ghcr.io/${{ github.repository_owner }}/${REPO_NAME}-${{ matrix.suffix }}
+
+          # Create manifest for latest
+          docker buildx imagetools create -t ${IMAGE}:latest \
+            ${IMAGE}:latest-amd64 \
+            ${IMAGE}:latest-arm64
+
+          # Create manifest for SHA
+          docker buildx imagetools create -t ${IMAGE}:${{ github.sha }} \
+            ${IMAGE}:${{ github.sha }}-amd64 \
+            ${IMAGE}:${{ github.sha }}-arm64
