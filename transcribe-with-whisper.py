@@ -84,6 +84,8 @@ def _hf_token_config_paths() -> list[Path]:
     cwd = Path.cwd()
     candidate_files.append(cwd / "transcription-files" / ".config" / "hf_token")
     candidate_files.append(cwd / ".config" / "hf_token")
+    # also check relative to /app (for Docker containers)
+    candidate_files.append(Path("/app") / "transcription-files" / ".config" / "hf_token")
 
     unique: list[Path] = []
     seen: set[str] = set()
