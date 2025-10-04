@@ -57,12 +57,17 @@ def _load_hf_token() -> str | None:
 
 def _get_hf_token() -> str | None:
     """Get HF token from environment or config file"""
-    # Check environment first (for backward compatibility)
+    # Prefer stored token if present (web flow saves token to disk)
+    file_token = _load_hf_token()
+    if file_token:
+        return file_token
+
+    # Fall back to environment variable for backward compatibility
     env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
     if env_token:
         return env_token
-    # Fall back to stored token
-    return _load_hf_token()
+
+    return None
 
 
 APP_DIR = Path(__file__).resolve().parent
