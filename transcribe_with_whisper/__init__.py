@@ -75,6 +75,17 @@ def check_models(token):
         print(f"❌ Could not access pyannote/speaker-diarization-community-1: {e}")
         sys.exit(1)
 
+def report_pyannote_version():
+    try:
+        import pyannote.audio  # type: ignore
+
+        version = getattr(pyannote.audio, "__version__", "unknown")
+        print(f"🎧 pyannote.audio version: {version}")
+        return version
+    except Exception as exc:
+        print(f"❌ pyannote.audio is not available: {exc}")
+        sys.exit(1)
+
 def run_preflight():
     print("🔎 Running preflight checks...")
     check_ffmpeg()
@@ -90,6 +101,7 @@ def run_preflight():
         token = check_hf_token()
         check_models(token)
     
+    report_pyannote_version()
     check_platform_notes()
     print("✅ All checks passed!\n")
 
