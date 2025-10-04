@@ -10,6 +10,10 @@ import webvtt
 import re
 import warnings
 try:
+    from importlib.metadata import PackageNotFoundError, version as pkg_version
+except ImportError:  # pragma: no cover - fallback for Python <3.8
+    from importlib_metadata import PackageNotFoundError, version as pkg_version  # type: ignore
+try:
     import torchaudio  # type: ignore
     _HAS_TORCHAUDIO = True
 except Exception:
@@ -28,6 +32,27 @@ warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
 warnings.filterwarnings("ignore", message=".*StreamingMediaDecoder has been deprecated.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.ffmpeg")
+
+
+def get_package_version() -> str:
+    """Return the project version from local metadata or installed package."""
+    distribution_name = "transcribe-with-whisper"
+
+    setup_path = Path(__file__).resolve().parent.parent / "setup.py"
+    if setup_path.exists():
+        match = re.search(r"version\s*=\s*['\"]([^'\"]+)['\"]", setup_path.read_text(encoding="utf-8"))
+        if match:
+            return match.group(1)
+
+    try:
+        return pkg_version(distribution_name)
+    except PackageNotFoundError:
+        try:
+            from pkg_resources import get_distribution  # type: ignore
+
+            return get_distribution(distribution_name).version
+        except Exception:
+            return "unknown"
 
 def millisec(timeStr):
     spl = timeStr.split(":")
@@ -897,6 +922,9 @@ Examples:
         '''
     )
     
+    parser.add_argument('--version', action='version', version=f"transcribe-with-whisper {get_package_version()}",
+                        help="Show the application's version number and exit")
+
     parser.add_argument('video_file', help='Video or audio file to transcribe')
     parser.add_argument('speaker_names', nargs='*', help='Optional speaker names (e.g., "Alice" "Bob")')
     parser.add_argument('--num-speakers', type=int, metavar='N',

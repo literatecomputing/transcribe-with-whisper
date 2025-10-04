@@ -94,10 +94,15 @@ def run_preflight():
     print("✅ All checks passed!\n")
 
 # Skip preflight checks in test environments, when explicitly disabled, or in web server mode
+# Also skip when invoking lightweight CLI commands like --version
+_CLI_ARGS = sys.argv[1:] if hasattr(sys, "argv") else []
+_REQUESTS_VERSION_ONLY = any(arg == "--version" for arg in _CLI_ARGS)
+
 if (not os.getenv("SKIP_PREFLIGHT_CHECKS") 
     and not os.getenv("SKIP_HF_STARTUP_CHECK")  # Legacy support for tests
     and not os.getenv("PYTEST_CURRENT_TEST") 
-    and not os.getenv("WEB_SERVER_MODE")):
+    and not os.getenv("WEB_SERVER_MODE")
+    and not _REQUESTS_VERSION_ONLY):
     run_preflight()
 
 import sys
