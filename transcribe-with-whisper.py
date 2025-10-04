@@ -5,6 +5,7 @@ import importlib
 import subprocess
 import shutil
 import platform
+from pathlib import Path
 
 REQUIRED_LIBS = [
     "pyannote.audio",
@@ -69,11 +70,56 @@ def check_ffmpeg():
             print(f"❌ Error checking ffmpeg: {e}")
             sys.exit(1)
 
+def _hf_token_config_paths() -> list[Path]:
+    """Return possible locations for the saved Hugging Face token."""
+    candidate_files: list[Path] = []
+
+    env_dir = os.getenv("TRANSCRIPTION_DIR")
+    if env_dir:
+        candidate_files.append(Path(env_dir) / ".config" / "hf_token")
+
+    repo_transcription = Path(__file__).resolve().parent / "transcription-files"
+    candidate_files.append(repo_transcription / ".config" / "hf_token")
+
+    cwd = Path.cwd()
+    candidate_files.append(cwd / "transcription-files" / ".config" / "hf_token")
+    candidate_files.append(cwd / ".config" / "hf_token")
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in candidate_files:
+        normalized = str(path)
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(path)
+
+    return unique
+
+def _load_hf_token_from_file() -> str | None:
+    """Load token from known config file locations."""
+    for path in _hf_token_config_paths():
+        try:
+            if path.exists():
+                token = path.read_text(encoding="utf-8").strip()
+                if token:
+                    print(f"🔐 Using Hugging Face token from {path}")
+                    return token
+        except (OSError, UnicodeDecodeError):
+            continue
+    return None
+
+def _resolve_hf_token() -> str | None:
+    token = _load_hf_token_from_file()
+    if token:
+        return token
+    return os.getenv("HUGGING_FACE_AUTH_TOKEN")
+
 def check_hf_token():
-    token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+    token = _resolve_hf_token()
     if not token:
         print("❌ HUGGING_FACE_AUTH_TOKEN environment variable is not set.")
         print("👉 Run: export HUGGING_FACE_AUTH_TOKEN=your_token_here")
+        print("   or use the MercuryScribe web UI to store the token in .config/hf_token")
         sys.exit(1)
     return token
 
@@ -124,7 +170,6 @@ warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
 
 #accept the user conditions on both https://hf.co/pyannote/speaker-diarization and https://hf.co/pyannote/segmentation.
 
-inputfile = sys.argv[1]
 if len(sys.argv) < 2:
     print("Usage: script.py <inputfile> [Speaker1] [Speaker2] [Speaker3] ...")
     sys.exit(1)
@@ -154,56 +199,66 @@ else:
 inputWav = basename + '.wav'
 video_title = basename
 
-# Convert to WAV if it doesn't exist
-if not os.path.isfile(inputWav):
-    subprocess.run(["ffmpeg", "-i", inputfile, inputWav])
-
-# Create directory if it doesn't exist
-if not os.path.isdir(basename):
+existing_vtt_files = []
+if os.path.isdir(basename):
+    existing_vtt_files = [
+        filename
+        for filename in os.listdir(basename)
+        if filename.endswith('.vtt') and filename[:-4].isdigit()
+    ]
+else:
     os.mkdir(basename)
+
+diarization_path = os.path.join(basename, f"{basename}-diarization.txt")
+reuse_existing = bool(existing_vtt_files) and os.path.isfile(diarization_path)
+
+if reuse_existing:
+    print(f"🔁 Found {len(existing_vtt_files)} existing speaker VTT files. Reusing cached results.")
+else:
+    print("🎯 No cached VTT files found. Running diarization and transcription pipeline.")
+    if not os.path.isfile(inputWav):
+        subprocess.run(["ffmpeg", "-i", inputfile, inputWav])
+
 os.chdir(basename)
 
-# Move inputWav into the working directory with cache naming
 inputWavCache = f'{basename}.cache.wav'
-if not os.path.isfile(inputWavCache):
-    print(f"Creating cache file: {inputWavCache}")
-    # Copy the WAV file into our working directory
-    audio_temp = AudioSegment.from_wav("../"+inputWav)
-    audio_temp.export(inputWavCache, format='wav')
-
-# print(f'Hello {name}! This is {program}')
-diarizationFile=f'{basename}-diarization.txt'
-outputWav=f'{basename}-spaced.wav'
-vttFile=f'{basename}-spaced.vtt'
-outputHtml=f'../{basename}.html'
-
+outputWav = f'{basename}-spaced.wav'
+diarizationFile = f'{basename}-diarization.txt'
+vttFile = f'{basename}-spaced.vtt'
+outputHtml = f'../{basename}.html'
+cleanup_files = not reuse_existing
 spacermilli = 2000
-spacer = AudioSegment.silent(duration=spacermilli)
-audio = AudioSegment.from_wav(inputWavCache)
-audio = spacer.append(audio, crossfade=0)
-audio.export(outputWav, format='wav')
 
-# Get auth token from environment variable
-auth_token = os.getenv('HUGGING_FACE_AUTH_TOKEN')
-if not auth_token:
-    raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
+if not reuse_existing:
+    if not os.path.isfile(inputWavCache):
+        print(f"Creating cache file: {inputWavCache}")
+        audio_temp = AudioSegment.from_wav("../" + inputWav)
+        audio_temp.export(inputWavCache, format='wav')
+    spacer = AudioSegment.silent(duration=spacermilli)
+    audio = AudioSegment.from_wav(inputWavCache)
+    audio = spacer.append(audio, crossfade=0)
+    audio.export(outputWav, format='wav')
 
-# Use appropriate API based on pyannote.audio version
-if _PYANNOTE_MAJOR >= 4:
-    # pyannote.audio 4.0.0+ API
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token=auth_token)
-else:
-    # pyannote.audio 3.x API
-    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=auth_token)
+    # Get auth token from saved config or environment
+    auth_token = _resolve_hf_token()
+    if not auth_token:
+        raise ValueError("Hugging Face auth token is required (set HUGGING_FACE_AUTH_TOKEN or store it in .config/hf_token)")
 
-DEMO_FILE = {'uri': 'blabla', 'audio': outputWav}
+    # Use appropriate API based on pyannote.audio version
+    if _PYANNOTE_MAJOR >= 4:
+        # pyannote.audio 4.0.0+ API
+        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token=auth_token)
+    else:
+        # pyannote.audio 3.x API
+        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=auth_token)
 
-if (not os.path.isfile(diarizationFile)):
-  dz = pipeline(DEMO_FILE)
-  # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
-  diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
-  with open(diarizationFile, "w") as text_file:
-    text_file.write(str(diarization))
+    DEMO_FILE = {'uri': 'blabla', 'audio': outputWav}
+
+    if not os.path.isfile(diarizationFile):
+        dz = pipeline(DEMO_FILE)
+        diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
+        with open(diarizationFile, "w") as text_file:
+            text_file.write(str(diarization))
 
 def millisec(timeStr):
   spl = timeStr.split(":")
@@ -241,65 +296,64 @@ if g:
 
 print(*groups, sep='\n')
 
-audio = AudioSegment.from_wav(outputWav)
-gidx = -1
+segments_created = 0
 
-for g in groups:
-  start = re.findall('[0-9]+:[0-9]+:[0-9]+\.[0-9]+', string=g[0])[0]
-  end = re.findall('[0-9]+:[0-9]+:[0-9]+\.[0-9]+', string=g[-1])[1]
-  start = millisec(start) #- spacermilli
-  end = millisec(end)  #- spacermilli
-  print(start, end)
-  gidx += 1
-  audio[start:end].export(str(gidx) + '.wav', format='wav')
+if not reuse_existing:
+    audio = AudioSegment.from_wav(outputWav)
+    gidx = -1
 
-# Initialize faster-whisper model once
-print("Loading Whisper model...")
-from faster_whisper import WhisperModel
-import platform
+    for g in groups:
+        start = re.findall('[0-9]+:[0-9]+:[0-9]+\.[0-9]+', string=g[0])[0]
+        end = re.findall('[0-9]+:[0-9]+:[0-9]+\.[0-9]+', string=g[-1])[1]
+        start = millisec(start)
+        end = millisec(end)
+        print(start, end)
+        gidx += 1
+        audio[start:end].export(str(gidx) + '.wav', format='wav')
 
-def load_whisper_model(model_size="base"):
-    """Load Whisper model with graceful fallback to CPU."""
-    system = platform.system()
-    machine = platform.machine()
+    # Initialize faster-whisper model once
+    print("Loading Whisper model...")
+    from faster_whisper import WhisperModel
 
-    print("🔊 Initializing Whisper...")
+    def load_whisper_model(model_size="base"):
+            """Load Whisper model with graceful fallback to CPU."""
+            system = platform.system()
+            machine = platform.machine()
 
-    try:
-        # Try "auto" first — will use CUDA, Metal, or CPU depending on build
-        model = WhisperModel(model_size, device="auto", compute_type="auto")
-        print("✅ Whisper model loaded with device=auto (GPU/Metal/CPU as available).")
-        return model
-    except Exception as e:
-        print(f"⚠️ Could not load Whisper with device=auto: {e}")
+            print("🔊 Initializing Whisper...")
 
-        # Apple Silicon fallback
-        if system == "Darwin" and machine == "arm64":
-            print("👉 Falling back to CPU mode on Apple Silicon (install faster-whisper[coreml] for GPU).")
-            return WhisperModel(model_size, device="cpu", compute_type="int8")
+            try:
+                    model = WhisperModel(model_size, device="auto", compute_type="auto")
+                    print("✅ Whisper model loaded with device=auto (GPU/Metal/CPU as available).")
+                    return model
+            except Exception as e:
+                    print(f"⚠️ Could not load Whisper with device=auto: {e}")
 
-        # Generic fallback
-        print("👉 Falling back to CPU mode.")
-        return WhisperModel(model_size, device="cpu", compute_type="int8")
+                    if system == "Darwin" and machine == "arm64":
+                            print("👉 Falling back to CPU mode on Apple Silicon (install faster-whisper[coreml] for GPU).")
+                            return WhisperModel(model_size, device="cpu", compute_type="int8")
 
-model = load_whisper_model("base")
+                    print("👉 Falling back to CPU mode.")
+                    return WhisperModel(model_size, device="cpu", compute_type="int8")
 
-for i in range(gidx+1):
-  if (not os.path.isfile(str(i) + '.vtt')):
-    print(f'Processing {str(i) + ".wav"}')
+    model = load_whisper_model("base")
 
-    # Use faster-whisper API instead of subprocess
-    segments, info = model.transcribe(str(i) + '.wav', language="en")
+    for i in range(gidx + 1):
+        if not os.path.isfile(str(i) + '.vtt'):
+            print(f'Processing {str(i) + ".wav"}')
 
-    # Write VTT file
-    with open(str(i) + '.vtt', "w", encoding="utf-8") as f:
-        f.write("WEBVTT\n\n")
-        for segment in segments:
-            start_time = format_time(segment.start)
-            end_time = format_time(segment.end)
-            f.write(f"{start_time} --> {end_time}\n{segment.text.strip()}\n\n")
+            segments, info = model.transcribe(str(i) + '.wav', language="en")
 
-    print(f"Completed {str(i)}.vtt")
+            with open(str(i) + '.vtt', "w", encoding="utf-8") as f:
+                    f.write("WEBVTT\n\n")
+                    for segment in segments:
+                            start_time = format_time(segment.start)
+                            end_time = format_time(segment.end)
+                            f.write(f"{start_time} --> {end_time}\n{segment.text.strip()}\n\n")
+
+            print(f"Completed {str(i)}.vtt")
+
+    segments_created = gidx + 1
 
 speakers = {
     "SPEAKER_00": (default_speakers[0], "lightgray", "darkorange"),
@@ -441,24 +495,23 @@ with open(outputHtml, "w") as text_file:
     text_file.write(s)
 
 # Clean up cache files if script completed successfully
-try:
-    if os.path.isfile(inputWavCache):
-        os.remove(inputWavCache)
-        print(f"Cleaned up cache file: {inputWavCache}")
+if cleanup_files:
+    try:
+        if os.path.isfile(inputWavCache):
+            os.remove(inputWavCache)
+            print(f"Cleaned up cache file: {inputWavCache}")
 
-    # Optionally clean up the spaced wav file too
-    if os.path.isfile(outputWav):
-        os.remove(outputWav)
-        print(f"Cleaned up cache file: {outputWav}")
+        if os.path.isfile(outputWav):
+            os.remove(outputWav)
+            print(f"Cleaned up cache file: {outputWav}")
 
-    # Clean up individual segment wav files
-    for i in range(gidx+1):
-        segment_wav = f"{i}.wav"
-        if os.path.isfile(segment_wav):
-            os.remove(segment_wav)
-            print(f"Cleaned up segment file: {segment_wav}")
+        for i in range(segments_created):
+            segment_wav = f"{i}.wav"
+            if os.path.isfile(segment_wav):
+                os.remove(segment_wav)
+                print(f"Cleaned up segment file: {segment_wav}")
 
-except Exception as e:
-    print(f"Note: Could not clean up some cache files: {e}")
+    except Exception as e:
+        print(f"Note: Could not clean up some cache files: {e}")
 
 print(f"Script completed successfully! Output: {outputHtml}")
