@@ -357,6 +357,7 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     for idx, g in enumerate(groups):
         # Use the actual start time of the diarization segment, not offset by spacermilli
         shift = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
+        spacer_offset_sec = spacermilli / 1000.0
         speaker = g[0].split()[-1]
         spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
         html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
@@ -368,8 +369,15 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             vtt_end_sec = c[1] / 1000
             
             # Add the diarization segment start time to get absolute video time
-            absolute_start_sec = vtt_start_sec + (shift / 1000)
-            absolute_end_sec = vtt_end_sec + (shift / 1000)
+            raw_start = vtt_start_sec + (shift / 1000) - spacer_offset_sec
+            raw_end = vtt_end_sec + (shift / 1000) - spacer_offset_sec
+
+            absolute_start_sec = max(0.0, raw_start)
+            # Normalize tiny offsets that stem from the spacer padding
+            if absolute_start_sec < 0.5 and vtt_start_sec == 0:
+                absolute_start_sec = 0.0
+
+            absolute_end_sec = max(absolute_start_sec, raw_end)
             
             startStr = f"{int(absolute_start_sec//3600):02d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:05.2f}"
             endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
