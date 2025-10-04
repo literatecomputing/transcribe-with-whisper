@@ -2,11 +2,22 @@
 # Start the MercuryScribe web server
 set -e
 
-# Get the directory where this script is located
-SCRIPT_DIR=$"$(dirname "${BASH_SOURCE[0]}")" 
+# Get absolute path to project root regardless of invocation location
+if command -v realpath >/dev/null 2>&1; then
+	SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}")"
+else
+	SCRIPT_PATH="$(python3 - <<'PY'
+import os, sys
+print(os.path.abspath(sys.argv[1]))
+PY
+"${BASH_SOURCE[0]}")"
+fi
+
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
+export PYTHONPATH="$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 # Default host and port
 HOST="${HOST:-0.0.0.0}"
