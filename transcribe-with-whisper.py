@@ -480,15 +480,17 @@ for g in groups:
     for c in captions:
       start = shift + c[0]
       start = start / 1000.0   #time resolution ot youtube is Second.
-      startStr = '{0:02d}:{1:02d}:{2:02.2f}'.format((int)(start // 3600),
+      startStr = '{0:01d}:{1:02d}:{2:02.f}'.format((int)(start // 3600),
                                               (int)(start % 3600 // 60),
                                               start % 60)
+      timestamp = '{0:01d}:{1:02d}:{2:04.2f}'.format((int)(start // 3600),
       #html.append(f'<div class="c">')
       #html.append(f'\t\t\t\t<a class="l" href="#{startStr}" id="{startStr}">#</a> \n')
+      html.append(f'\t\t\t\<span class="timestamp" style="color: gray">[{timestamp}] </span>\n')
       html.append(f'\t\t\t\t<a href="#{startStr}" id="{startStr}" class="lt" onclick="jumptoTime({int(start)}, this.id)">{c[2]}</a>\n')
       #html.append(f'\t\t\t\t<div class="t"> {c[2]}</div><br>\n')
       #html.append(f'</div>')
-    html.append(f'</div>\n');
+    html.append(f'EEEEk</div>\n');
 
 html.append(postS)
 s = "".join(html)
