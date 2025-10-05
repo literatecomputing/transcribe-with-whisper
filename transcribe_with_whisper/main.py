@@ -353,15 +353,36 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             width: 100%;
             background: #efe7dd;
             z-index: 1000;
-            padding: 10px 0;
+            padding: 12px 24px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }}
+        #video-header .page-title {{
+            text-align: center;
+            margin: 0;
+            font-size: 1.5rem;
+        }}
+        .header-main {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 16px;
+        }}
+        .media-wrapper {{
+            flex: 0 1 auto;
+            display: flex;
+            justify-content: flex-start;
         }}
         #player {{
-            display: block;
-            margin: 0 auto;
+            max-height: min(28vh, 320px);
+            width: clamp(280px, 40vw, 540px);
+            height: auto;
+            border: none;
         }}
         #content {{
-            margin-top: 380px;
+            margin-top: max(calc(28vh + 120px), 360px);
         }}
         .timestamp {{
             color: #666;
@@ -375,8 +396,12 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         
         /* Edit mode styles */
         .edit-controls {{
-            text-align: center;
-            margin: 10px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: flex-start;
+            align-items: stretch;
+            margin: 0;
         }}
         .edit-btn {{
             background: #007bff;
@@ -385,8 +410,10 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
-            margin: 0 5px;
+            margin: 0;
             font-size: 14px;
+            width: 100%;
+            text-align: left;
         }}
         .edit-btn:hover {{
             background: #0056b3;
@@ -460,23 +487,25 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
 </head>
   <body>
    """ + f"""
-    <div id="video-header" class="html-only">
-    <h2 style="text-align: center; margin: 5px 0;">{video_title}</h2>
-    <p style="text-align: center; margin: 5px 0; font-style: italic;">Click on a word to jump to that section of the video</p>
-    <video id="player" style="border:none;" width="575" height="240" preload controls>
-      <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
-    </video>
-    
-    <div class="edit-controls">
-      <button id="edit-mode-btn" class="edit-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
-      <button id="edit-speakers-btn" class="edit-btn" onclick="editSpeakers()">👥 Edit Speakers</button>
-      <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">🔄 Reprocess</button>
-      <button id="back-to-list-btn" class="edit-btn" onclick="goBackToList()">📋 View All Files</button>
-      <button id="save-btn" class="edit-btn" onclick="saveChanges()" style="display: none;">💾 Save Changes</button>
-      <button id="cancel-btn" class="edit-btn" onclick="cancelEdits()" style="display: none;">❌ Cancel</button>
-      <span id="save-status" class="save-status"></span>
-    </div>
-    </div>
+        <div id="video-header" class="html-only">
+        <h2 class="page-title">{video_title}</h2>
+        <div class="header-main">
+            <div class="edit-controls">
+                <button id="edit-mode-btn" class="edit-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
+                <button id="edit-speakers-btn" class="edit-btn" onclick="editSpeakers()">👥 Edit Speakers</button>
+                <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">🔄 Reprocess</button>
+                <button id="back-to-list-btn" class="edit-btn" onclick="goBackToList()">📋 View All Files</button>
+                <button id="save-btn" class="edit-btn" onclick="saveChanges()" style="display: none;">💾 Save Changes</button>
+                <button id="cancel-btn" class="edit-btn" onclick="cancelEdits()" style="display: none;">❌ Cancel</button>
+                <span id="save-status" class="save-status"></span>
+            </div>
+            <div class="media-wrapper">
+                <video id="player" preload controls>
+                    <source src="{inputfile}" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
+                </video>
+            </div>
+        </div>
+        </div>
     <div id="content">
   <div class="e" style="background-color: white">
   """
