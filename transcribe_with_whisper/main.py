@@ -2,6 +2,8 @@ import sys
 import os
 import subprocess
 import argparse
+import platform
+import importlib
 from pathlib import Path
 from pyannote.audio import Pipeline
 from pydub import AudioSegment
@@ -32,6 +34,121 @@ warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
 warnings.filterwarnings("ignore", message=".*StreamingMediaDecoder has been deprecated.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.ffmpeg")
+
+
+def is_apple_silicon() -> bool:
+    """Return True when running on an Apple Silicon Mac."""
+    return platform.system() == "Darwin" and platform.machine().lower() in {"arm64", "aarch64"}
+
+
+def _torch_mps_available() -> bool:
+    """Detect whether PyTorch Metal (MPS) backend is available."""
+    try:
+        import torch  # type: ignore
+
+        mps_backend = getattr(torch.backends, "mps", None)
+        if mps_backend is None:
+            return False
+        return bool(getattr(mps_backend, "is_available", lambda: False)())
+    except Exception:
+        return False
+
+
+def _maybe_move_pipeline_to_mps(pipeline) -> bool:
+    """Attempt to move a pyannote Pipeline to the MPS device if available."""
+    if not is_apple_silicon() or not _torch_mps_available():
+        return False
+
+    try:
+        import torch  # type: ignore
+
+        pipeline.to(torch.device("mps"))
+        print("⚡️ Using Apple Metal (MPS) acceleration for diarization.")
+        return True
+    except AttributeError:
+        # Pipeline does not expose .to(); ignore silently
+        return False
+    except Exception as exc:
+        print(f"⚠️ Could not enable MPS for pyannote pipeline: {exc}")
+        return False
+
+
+def _has_coreml_extension() -> bool:
+    """Check whether the installed faster-whisper build exposes the CoreML extension."""
+    try:
+        ext_module = importlib.import_module("ctranslate2._ext")  # type: ignore[import]
+    except ModuleNotFoundError:
+        return False
+    except Exception:
+        return False
+    return hasattr(ext_module, "coreml")
+
+
+def create_whisper_model(
+    model_size: str,
+    device: str | None = None,
+    compute_type: str | None = None,
+    coreml_units: str | None = None,
+):
+    """Instantiate WhisperModel with sensible defaults and optional CoreML acceleration."""
+    requested_device = (device or "auto").lower()
+    requested_compute_type = compute_type or "auto"
+    requested_coreml_units = coreml_units.lower() if coreml_units else None
+
+    if requested_coreml_units and not _has_coreml_extension():
+        print(
+            "⚠️ CoreML compute units were requested but faster-whisper[coreml] isn't installed. "
+            "Install it on Apple Silicon to enable CoreML acceleration."
+        )
+        requested_coreml_units = None
+
+    model_kwargs: dict[str, str] = {}
+    attempted_coreml = False
+
+    if requested_coreml_units:
+        attempted_coreml = True
+        model_kwargs["coreml_compute_units"] = requested_coreml_units
+        if requested_device == "auto":
+            requested_device = "cpu"
+        if requested_compute_type in (None, "auto", "default"):
+            requested_compute_type = "int8"
+    elif requested_device == "auto" and is_apple_silicon() and _has_coreml_extension():
+        attempted_coreml = True
+        requested_device = "cpu"
+        if requested_compute_type in (None, "auto", "default"):
+            requested_compute_type = "int8"
+        requested_coreml_units = "all"
+        model_kwargs["coreml_compute_units"] = requested_coreml_units
+        print("🍎 Apple Silicon detected; enabling CoreML acceleration (compute_units=all).")
+
+    resolved_coreml_units = model_kwargs.get("coreml_compute_units")
+
+    try:
+        model = WhisperModel(
+            model_size,
+            device=requested_device,
+            compute_type=requested_compute_type,
+            **model_kwargs,
+        )
+    except Exception as exc:
+        if attempted_coreml:
+            print(
+                f"⚠️ CoreML acceleration request failed ({exc}). "
+                "Falling back to default Whisper settings."
+            )
+            model_kwargs = {}
+            resolved_coreml_units = None
+            model = WhisperModel(model_size, device=(device or "auto"), compute_type=(compute_type or "auto"))
+        else:
+            raise
+
+    actual_device = getattr(model.model, "device", requested_device)
+    actual_compute = getattr(model.model, "compute_type", requested_compute_type)
+    print(f"Loaded Whisper model '{model_size}' on device={actual_device} (compute_type={actual_compute})")
+    if resolved_coreml_units:
+        print(f"CoreML compute units: {resolved_coreml_units}")
+
+    return model
 
 
 def get_package_version() -> str:
@@ -87,6 +204,8 @@ def get_diarization(inputWav, diarizationFile, num_speakers=None, min_speakers=N
     else:
         # pyannote.audio 3.x API
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=auth_token)
+
+    _maybe_move_pipeline_to_mps(pipeline)
 
     if not os.path.isfile(diarizationFile):
         # Add progress hook to report diarization progress
@@ -155,8 +274,14 @@ def export_segments_audio(groups, inputWav, spacermilli=2000):
         segment_files.append(f"{idx}.wav")
     return segment_files
 
-def transcribe_segments(segment_files):
-    model = WhisperModel("base", device="auto", compute_type="auto")
+def transcribe_segments(
+    segment_files,
+    model_size="base",
+    device="auto",
+    compute_type="auto",
+    coreml_units=None,
+):
+    model = create_whisper_model(model_size, device=device, compute_type=compute_type, coreml_units=coreml_units)
     total_segments = len(segment_files)
     for idx, f in enumerate(segment_files, start=1):
         vtt_file = f"{Path(f).stem}.vtt"
@@ -381,15 +506,15 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
             
             startStr = f"{int(absolute_start_sec//3600):02d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:05.2f}"
             endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
-            
+            timestamp = f"{int(absolute_start_sec//3600):01d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:04.1f}"
             # Include speaker name and timestamp for DOCX export, wrapped for editing
             # Add VTT file and timestamp data attributes for precise editing
             html.append(f'      <div class="transcript-segment" '
                        f'data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}" '
                        f'data-vtt-file="{vtt_filename}" data-vtt-start="{vtt_start_sec}" data-vtt-end="{vtt_end_sec}" '
                        f'data-caption-idx="{ci}">')
-            html.append(f'        <span class="timestamp">[{startStr}] </span>')
             html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
+            html.append(f'        <span class="timestamp">[{timestamp}] </span>')
             html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>')
             html.append(f'      </div>')
         html.append("    </div>")
@@ -833,7 +958,17 @@ def discover_speakers_from_groups(groups):
         speakers_found.add(speaker)
     return sorted(list(speakers_found))
 
-def transcribe_video(inputfile, speaker_names=None, num_speakers=None, min_speakers=None, max_speakers=None):
+def transcribe_video(
+    inputfile,
+    speaker_names=None,
+    num_speakers=None,
+    min_speakers=None,
+    max_speakers=None,
+    whisper_model="base",
+    whisper_device="auto",
+    whisper_compute_type="auto",
+    coreml_units=None,
+):
     basename = Path(inputfile).stem
     workdir = basename
     Path(workdir).mkdir(exist_ok=True)
@@ -850,7 +985,13 @@ def transcribe_video(inputfile, speaker_names=None, num_speakers=None, min_speak
     groups = group_segments(dzs)
 
     segment_files = export_segments_audio(groups, outputWav)
-    vtt_files = transcribe_segments(segment_files)
+    vtt_files = transcribe_segments(
+        segment_files,
+        model_size=whisper_model,
+        device=whisper_device,
+        compute_type=whisper_compute_type,
+        coreml_units=coreml_units,
+    )
 
     # Discover which speakers are actually present
     actual_speakers = discover_speakers_from_groups(groups)
