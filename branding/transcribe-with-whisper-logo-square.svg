@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Transcribe with Whisper logo">
+  <defs>
+    <!-- Blue gradient -->
+    <linearGradient id="tw-blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <!-- Violet gradient -->
+    <linearGradient id="tw-violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Wave mark -->
+  <g transform="translate(24,14)">
+    <rect x="0"   y="44" width="12" height="32" rx="6" fill="url(#tw-violet)"/>
+    <rect x="20"  y="30" width="12" height="60" rx="6" fill="url(#tw-blue)"/>
+    <rect x="40"  y="10" width="12" height="100" rx="6" fill="url(#tw-violet)"/>
+    <rect x="60"  y="30" width="12" height="60" rx="6" fill="url(#tw-blue)"/>
+    <rect x="80"  y="44" width="12" height="32" rx="6" fill="url(#tw-violet)"/>
+  </g>
+  
+  <!-- Wordmark -->
+</svg>
