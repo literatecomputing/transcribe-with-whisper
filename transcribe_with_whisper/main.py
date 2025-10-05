@@ -4,6 +4,8 @@ import subprocess
 import argparse
 import platform
 import importlib
+import base64
+from functools import lru_cache
 from pathlib import Path
 import re
 import warnings
@@ -38,6 +40,23 @@ warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
 warnings.filterwarnings("ignore", message=".*StreamingMediaDecoder has been deprecated.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._backend.ffmpeg")
+
+
+@lru_cache(maxsize=1)
+def _get_embedded_favicon_data_uri() -> str | None:
+    """Return the data URI for the bundled square logo favicon."""
+    logo_path = Path(__file__).resolve().parent.parent / "branding" / "transcribe-with-whisper-logo-square.svg"
+    if not logo_path.exists():
+        return None
+
+    try:
+        svg_bytes = logo_path.read_bytes()
+    except OSError as exc:
+        print(f"⚠️ Unable to read favicon asset: {exc}")
+        return None
+
+    encoded = base64.b64encode(svg_bytes).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def is_apple_silicon() -> bool:
@@ -303,10 +322,9 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
     # video_title is inputfile with no extension
     video_title = os.path.splitext(inputfile)[0]
     html = []
-    preS = f"""<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>{inputfile}</title>
-    <style>
+    favicon_href = _get_embedded_favicon_data_uri()
+    favicon_tag = f"\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon_href}\">" if favicon_href else ""
+    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}\n    <style>
         body {{
             font-family: sans-serif;
             font-size: 18px;
