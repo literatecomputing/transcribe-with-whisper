@@ -5,12 +5,16 @@ import argparse
 import platform
 import importlib
 from pathlib import Path
+import re
+import warnings
+from transcribe_with_whisper import ensure_preflight
+
+ensure_preflight()
+
 from pyannote.audio import Pipeline
 from pydub import AudioSegment
 from faster_whisper import WhisperModel
 import webvtt
-import re
-import warnings
 try:
     from importlib.metadata import PackageNotFoundError, version as pkg_version
 except ImportError:  # pragma: no cover - fallback for Python <3.8

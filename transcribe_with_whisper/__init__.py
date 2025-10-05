@@ -105,17 +105,38 @@ def run_preflight():
     check_platform_notes()
     print("✅ All checks passed!\n")
 
-# Skip preflight checks in test environments, when explicitly disabled, or in web server mode
-# Also skip when invoking lightweight CLI commands like --version
-_CLI_ARGS = sys.argv[1:] if hasattr(sys, "argv") else []
-_REQUESTS_VERSION_ONLY = any(arg == "--version" for arg in _CLI_ARGS)
+def should_run_preflight() -> bool:
+    """Return True if preflight checks should run in this context."""
 
-if (not os.getenv("SKIP_PREFLIGHT_CHECKS") 
-    and not os.getenv("SKIP_HF_STARTUP_CHECK")  # Legacy support for tests
-    and not os.getenv("PYTEST_CURRENT_TEST") 
-    and not os.getenv("WEB_SERVER_MODE")
-    and not _REQUESTS_VERSION_ONLY):
-    run_preflight()
+    if os.getenv("SKIP_PREFLIGHT_CHECKS"):
+        return False
+    if os.getenv("SKIP_HF_STARTUP_CHECK"):
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    if os.getenv("WEB_SERVER_MODE"):
+        return False
+
+    cli_args = sys.argv[1:] if hasattr(sys, "argv") else []
+    if any(arg == "--version" for arg in cli_args):
+        return False
+
+    if hasattr(sys, "argv") and sys.argv:
+        try:
+            argv0_normalized = sys.argv[0].replace("\\", "/")
+            if "transcribe_with_whisper/server_app.py" in argv0_normalized:
+                return False
+        except Exception:
+            pass
+
+    return True
+
+
+def ensure_preflight() -> None:
+    """Run preflight checks if allowed for the current context."""
+
+    if should_run_preflight():
+        run_preflight()
 
 import sys
 import os
