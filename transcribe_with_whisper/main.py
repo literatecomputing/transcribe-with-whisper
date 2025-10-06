@@ -6,6 +6,7 @@ import platform
 import importlib
 import base64
 import textwrap
+import shlex
 import html as html_module
 from functools import lru_cache
 from pathlib import Path
@@ -333,6 +334,7 @@ def generate_html(
     speaker_inline=True,
     spacermilli=2000,
     called_by_mercuryweb=False,
+    mercury_command: str | None = None,
 ):
     # video_title is inputfile with no extension
     video_title = os.path.splitext(inputfile)[0]
@@ -341,7 +343,14 @@ def generate_html(
     favicon_tag = f"\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon_href}\">" if favicon_href else ""
     generator_source = "mercuryweb" if called_by_mercuryweb else "transcribe-with-whisper"
     generator_meta_tag = f"\n    <meta name=\"generator\" content=\"{generator_source} {get_package_version()}\">"
-    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}\n    <style>
+    command_meta_tag = ""
+    section_meta_tag = f"\n    <meta name=\"speaker-section\" content=\"{'true' if speaker_section else 'false'}\">"
+    inline_meta_tag = f"\n    <meta name=\"speaker-inline\" content=\"{'true' if speaker_inline else 'false'}\">"
+    if mercury_command:
+        escaped_command = html_module.escape(mercury_command, quote=True)
+        command_meta_tag = f"\n    <meta name=\"mercuryscribe-command\" content=\"{escaped_command}\">"
+
+    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}{command_meta_tag}{section_meta_tag}{inline_meta_tag}\n    <style>
         body {{
             font-family: sans-serif;
             font-size: 18px;
@@ -1051,6 +1060,7 @@ def transcribe_video(
     whisper_compute_type="auto",
     coreml_units=None,
     called_by_mercuryweb=False,
+    mercury_command: str | None = None,
 ):
     basename = Path(inputfile).stem
     workdir = basename
@@ -1136,6 +1146,7 @@ def transcribe_video(
         speaker_section=speaker_section,
         speaker_inline=speaker_inline,
         called_by_mercuryweb=called_by_mercuryweb,
+        mercury_command=mercury_command,
     )
     cleanup([inputWavCache, outputWav] + segment_files)
     print(f"Script completed successfully! Output: ../{basename}.html")
@@ -1196,6 +1207,7 @@ Examples:
         help='Indicate whether the invocation originated from the Mercury web interface.'
     )
     args = parser.parse_args()
+    command_line = " ".join(shlex.quote(arg) for arg in sys.argv)
     
     # Validate speaker constraints
     if args.num_speakers is not None and (args.min_speakers is not None or args.max_speakers is not None):
@@ -1228,6 +1240,7 @@ Examples:
         speaker_section=args.speaker_section,
         speaker_inline=args.speaker_inline,
         called_by_mercuryweb=args.called_by_mercuryweb,
+        mercury_command=command_line,
     )    
 
 
