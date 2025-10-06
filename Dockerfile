@@ -60,10 +60,17 @@ package_root = pathlib.Path(transcribe_with_whisper.__file__).resolve().parent.p
 src = pathlib.Path('/app/branding')
 dst = package_root / 'branding'
 
-if src.exists():
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+if not src.is_dir():
+    print("⚠️ Branding assets not found at /app/branding; skipping copy.")
+else:
+    try:
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+    except FileNotFoundError:
+        print("⚠️ Branding assets missing during copy; skipping.")
+    except Exception as exc:
+        print(f"⚠️ Unable to copy branding assets: {exc}")
 PY
 
 # Runtime env and directories
