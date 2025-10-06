@@ -346,11 +346,21 @@ def generate_html(
     command_meta_tag = ""
     section_meta_tag = f"\n    <meta name=\"speaker-section\" content=\"{'true' if speaker_section else 'false'}\">"
     inline_meta_tag = f"\n    <meta name=\"speaker-inline\" content=\"{'true' if speaker_inline else 'false'}\">"
+    speaker_meta_tags = ""
+    for speaker_id, (speaker_name, bg_color, text_color) in sorted(speakers.items(), key=lambda item: str(item[0])):
+        escaped_id = html_module.escape(str(speaker_id), quote=True)
+        escaped_name = html_module.escape(speaker_name, quote=True)
+        escaped_bg = html_module.escape(bg_color, quote=True)
+        escaped_fg = html_module.escape(text_color, quote=True)
+        speaker_meta_tags += (
+            f"\n    <meta name=\"speaker\" data-id=\"{escaped_id}\" "
+            f"data-bg=\"{escaped_bg}\" data-fg=\"{escaped_fg}\" content=\"{escaped_name}\">"
+        )
     if mercury_command:
         escaped_command = html_module.escape(mercury_command, quote=True)
         command_meta_tag = f"\n    <meta name=\"mercuryscribe-command\" content=\"{escaped_command}\">"
 
-    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}{command_meta_tag}{section_meta_tag}{inline_meta_tag}\n    <style>
+    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}{command_meta_tag}{section_meta_tag}{inline_meta_tag}{speaker_meta_tags}\n    <style>
         body {{
             font-family: sans-serif;
             font-size: 18px;
