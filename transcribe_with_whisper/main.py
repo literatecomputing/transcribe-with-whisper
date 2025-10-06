@@ -6,6 +6,7 @@ import platform
 import importlib
 import base64
 import textwrap
+import html as html_module
 from functools import lru_cache
 from pathlib import Path
 import re
@@ -304,6 +305,8 @@ def transcribe_segments(
     device="auto",
     compute_type="auto",
     coreml_units=None,
+    speaker_header=False,
+    speaker_inline=True
 ):
     model = create_whisper_model(model_size, device=device, compute_type=compute_type, coreml_units=coreml_units)
     total_segments = len(segment_files)
@@ -319,7 +322,17 @@ def transcribe_segments(
             print(f"Completed segment {idx}/{total_segments}", flush=True)
     return [f"{Path(f).stem}.vtt" for f in segment_files]
 
-def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermilli=2000):
+def generate_html(
+    outputHtml,
+    groups,
+    vtt_files,
+    inputfile,
+    speakers,
+    *,
+    speaker_section=True,
+    speaker_inline=True,
+    spacermilli=2000,
+):
     # video_title is inputfile with no extension
     video_title = os.path.splitext(inputfile)[0]
     html = []
@@ -537,7 +550,14 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
         spacer_offset_sec = spacermilli / 1000.0
         speaker = g[0].split()[-1]
         spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
-        html.append(f'    <div class="e" style="background-color:{boxclr}"><span style="color:{spkrclr}">{spkr_name}</span><br>')
+        escaped_speaker_id = html_module.escape(speaker, quote=True)
+        escaped_speaker_name = html_module.escape(spkr_name, quote=True)
+        html.append(
+            f'    <div class="e" data-speaker-id="{escaped_speaker_id}" '
+            f'data-speaker-name="{escaped_speaker_name}" style="background-color:{boxclr}">'
+        )
+        if speaker_section:
+            html.append(f'      <span style="color:{spkrclr}">{spkr_name}</span><br>')
         captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
         vtt_filename = Path(vtt_files[idx]).name
         for ci, c in enumerate(captions):
@@ -565,7 +585,8 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
                        f'data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}" '
                        f'data-vtt-file="{vtt_filename}" data-vtt-start="{vtt_start_sec}" data-vtt-end="{vtt_end_sec}" '
                        f'data-caption-idx="{ci}">')
-            html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
+            if speaker_inline:
+                html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
             html.append(f'        <span class="timestamp">[{timestamp}] </span>')
             html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>')
             html.append(f'      </div>')
@@ -845,14 +866,18 @@ def generate_html(outputHtml, groups, vtt_files, inputfile, speakers, spacermill
       
       function editSpeakers() {
           // Extract current speakers from the page
-          const speakerElements = document.querySelectorAll('.e span[style*="color:"]');
+          const speakerBlocks = document.querySelectorAll('.e[data-speaker-id]');
           const speakers = [];
-          const seenSpeakers = new Set();
+          const seenSpeakerIds = new Set();
           
-          speakerElements.forEach(el => {
-              const speakerName = el.textContent.trim();
-              if (speakerName && !seenSpeakers.has(speakerName)) {
-                  seenSpeakers.add(speakerName);
+          speakerBlocks.forEach(block => {
+              const speakerId = block.dataset.speakerId;
+              if (!speakerId || seenSpeakerIds.has(speakerId)) {
+                  return;
+              }
+              seenSpeakerIds.add(speakerId);
+              const speakerName = (block.dataset.speakerName || speakerId).trim();
+              if (speakerName) {
                   speakers.push(speakerName);
               }
           });
@@ -1016,6 +1041,8 @@ def transcribe_video(
     num_speakers=None,
     min_speakers=None,
     max_speakers=None,
+    speaker_section=True,
+    speaker_inline=True,
     whisper_model="base",
     whisper_device="auto",
     whisper_compute_type="auto",
@@ -1096,7 +1123,15 @@ def transcribe_video(
         save_speaker_config(basename, speakers)
         print("Updated speaker config with newly detected speakers")
 
-    generate_html(f"../{basename}.html", groups, vtt_files, inputfile, speakers)
+    generate_html(
+        f"../{basename}.html",
+        groups,
+        vtt_files,
+        inputfile,
+        speakers,
+        speaker_section=speaker_section,
+        speaker_inline=speaker_inline,
+    )
     cleanup([inputWavCache, outputWav] + segment_files)
     print(f"Script completed successfully! Output: ../{basename}.html")
 
@@ -1134,7 +1169,20 @@ Examples:
                         help='Minimum number of speakers')
     parser.add_argument('--max-speakers', type=int, metavar='N',
                         help='Maximum number of speakers')
-    
+    parser.add_argument(
+        '--speaker-section',
+        dest='speaker_section',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help='Include speaker when speakers switch turns.'
+    )
+    parser.add_argument(
+        '--speaker-inline',
+        dest='speaker_inline',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Include speaker label on each line (use --no-speaker-inline to hide).'
+    )
     args = parser.parse_args()
     
     # Validate speaker constraints
@@ -1164,7 +1212,9 @@ Examples:
         args.speaker_names if args.speaker_names else None,
         args.num_speakers,
         args.min_speakers,
-        args.max_speakers
+        args.max_speakers,
+        speaker_section=args.speaker_section,
+        speaker_inline=args.speaker_inline
     )    
 
 
