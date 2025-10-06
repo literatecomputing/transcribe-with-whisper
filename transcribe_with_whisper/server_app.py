@@ -39,8 +39,11 @@ def _save_hf_token(token: str) -> None:
     """Save Hugging Face token to config file"""
     config_file = _get_config_dir() / "hf_token"
     config_file.touch(mode=0o600)
-    config_file.write_text(token.strip(), encoding='utf-8')
+    normalized = token.strip()
+    config_file.write_text(normalized, encoding='utf-8')
     config_file.chmod(0o600)
+    if normalized:
+        os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
 
 def _load_hf_token() -> str | None:
     """Load Hugging Face token from config file"""
@@ -53,17 +56,18 @@ def _load_hf_token() -> str | None:
             return None
     return None
 
-def _get_hf_token() -> str | None:
-    """Get HF token from environment or config file"""
-    # Prefer stored token if present (web flow saves token to disk)
+def _prime_token_env() -> str | None:
+    """Ensure HUGGING_FACE_AUTH_TOKEN is populated from env or saved file."""
+    env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+    if env_token and env_token.strip():
+        normalized = env_token.strip()
+        os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
+        return normalized
+
     file_token = _load_hf_token()
     if file_token:
+        os.environ["HUGGING_FACE_AUTH_TOKEN"] = file_token
         return file_token
-
-    # Fall back to environment variable for backward compatibility
-    env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
-    if env_token:
-        return env_token
 
     return None
 
@@ -87,6 +91,9 @@ TRANSCRIPTION_DIR = Path(
     )
 )
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
+
+# Load saved token into environment if needed
+_prime_token_env()
 
 
 @asynccontextmanager
@@ -613,7 +620,7 @@ def _build_cli_cmd(
 
 
 def _validate_hf_token_or_die() -> None:
-    token = _get_hf_token()
+    token = _prime_token_env()
     if not token:
         raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
     try:
@@ -679,7 +686,7 @@ def _validate_hf_token(token: str) -> dict:
 
 def _has_valid_token() -> bool:
     """Check if a valid token exists (graceful version that doesn't crash)"""
-    token = _get_hf_token()
+    token = _prime_token_env()
     if not token:
         return False
     
@@ -926,7 +933,7 @@ def _run_transcription_job(
         
         # Prepare environment with token
         env = os.environ.copy()
-        token = _get_hf_token()
+        token = _prime_token_env()
         if token:
             env["HUGGING_FACE_AUTH_TOKEN"] = token
         
@@ -1021,7 +1028,7 @@ async def upload(
     max_speakers: Optional[str] = Form(default=None)
 ):
     global job_counter, jobs
-    if not _get_hf_token():
+    if not _prime_token_env():
         return PlainTextResponse(
             "HUGGING_FACE_AUTH_TOKEN not set. Set it when running the server.", status_code=500
         )
