@@ -1,715 +1,1244 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>test-audio.mp3</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJUcmFuc2NyaWJlIHdpdGggV2hpc3BlciBsb2dvIj4KICA8ZGVmcz4KICAgIDwhLS0gQmx1ZSBncmFkaWVudCAtLT4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0idHctYmx1ZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNjBBNUZBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzNCODJGNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwhLS0gVmlvbGV0IGdyYWRpZW50IC0tPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJ0dy12aW9sZXQiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI0E3OEJGQSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM3QzNBRUQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIAogIDwhLS0gV2F2ZSBtYXJrIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI0LDE0KSI+CiAgICA8cmVjdCB4PSIwIiAgIHk9IjQ0IiB3aWR0aD0iMTIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSJ1cmwoI3R3LXZpb2xldCkiLz4KICAgIDxyZWN0IHg9IjIwIiAgeT0iMzAiIHdpZHRoPSIxMiIgaGVpZ2h0PSI2MCIgcng9IjYiIGZpbGw9InVybCgjdHctYmx1ZSkiLz4KICAgIDxyZWN0IHg9IjQwIiAgeT0iMTAiIHdpZHRoPSIxMiIgaGVpZ2h0PSIxMDAiIHJ4PSI2IiBmaWxsPSJ1cmwoI3R3LXZpb2xldCkiLz4KICAgIDxyZWN0IHg9IjYwIiAgeT0iMzAiIHdpZHRoPSIxMiIgaGVpZ2h0PSI2MCIgcng9IjYiIGZpbGw9InVybCgjdHctYmx1ZSkiLz4KICAgIDxyZWN0IHg9IjgwIiAgeT0iNDQiIHdpZHRoPSIxMiIgaGVpZ2h0PSIzMiIgcng9IjYiIGZpbGw9InVybCgjdHctdmlvbGV0KSIvPgogIDwvZz4KICAKICA8IS0tIFdvcmRtYXJrIC0tPgo8L3N2Zz4K"
+    />
+    <meta name="generator" content="transcribe-with-whisper 0.7.0" />
     <style>
-        body {
-            font-family: sans-serif;
-            font-size: 18px;
-            color: #111;
-            padding: 0 0 1em 0;
-	        background-color: #efe7dd;
-        }
-        table {
-             border-spacing: 10px;
-        }
-        th { text-align: left;}
-        .lt {
-          color: inherit;
-          text-decoration: inherit;
-        }
-        .l {
-          color: #050;
-        }
-        .s {
-            display: inline-block;
-        }
-        .c {
-            display: inline-block;
-        }
-        .e {
-            border-radius: 20px;
-            width: fit-content;
-            height: fit-content;
-            padding: 5px 30px 5px 30px;
-            font-size: 18px;
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 10px;
-        }
+      body {
+        font-family: sans-serif;
+        font-size: 18px;
+        color: #111;
+        padding: 0 0 1em 0;
+        background-color: #efe7dd;
+      }
+      table {
+        border-spacing: 10px;
+      }
+      th {
+        text-align: left;
+      }
+      .lt {
+        color: inherit;
+        text-decoration: inherit;
+      }
+      .l {
+        color: #050;
+      }
+      .s {
+        display: inline-block;
+      }
+      .c {
+        display: inline-block;
+      }
+      .e {
+        border-radius: 20px;
+        width: fit-content;
+        height: fit-content;
+        padding: 5px 30px 5px 30px;
+        font-size: 18px;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 10px;
+      }
 
-        .t {
-            display: inline-block;
-        }
-        #video-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            background: #efe7dd;
-            z-index: 1000;
-            padding: 10px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        #player {
-            display: block;
-            margin: 0 auto;
-        }
-        #content {
-            margin-top: 380px;
-        }
-        .timestamp {
-            color: #666;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .speaker-name {
-            font-weight: bold;
-            margin-right: 8px;
-        }
-        
-        /* Edit mode styles */
-        .edit-controls {
-            text-align: center;
-            margin: 10px 0;
-        }
-        .edit-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 0 5px;
-            font-size: 14px;
-        }
-        .edit-btn:hover {
-            background: #0056b3;
-        }
-        .edit-btn.active {
-            background: #28a745;
-        }
-        .edit-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-        .save-status {
-            display: inline-block;
-            margin-left: 10px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-        .save-success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .save-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        /* Editable transcript styles */
-        .transcript-segment {
-            position: relative;
-        }
-        .transcript-segment.editable {
-            border: 1px dashed #007bff;
-            border-radius: 4px;
-            margin: 2px 0;
-        }
-        .transcript-segment.editable:hover {
-            background-color: #f8f9fa;
-        }
-        .transcript-segment.editing {
-            background-color: #fff3cd;
-            border: 2px solid #ffc107;
-        }
-        .transcript-text {
-            cursor: text;
-        }
-        .transcript-segment.editable .transcript-text {
-            min-height: 1.2em;
-            padding: 2px 4px;
-            border-radius: 2px;
-        }
-        .transcript-text[contenteditable="true"] {
-            outline: none;
-            background: #fffbf0;
-            border: 1px solid #ffc107;
-            border-radius: 2px;
-        }
-        
-        /* Hide server-dependent buttons when viewing as local file */
-        .local-file-mode #edit-mode-btn,
-        .local-file-mode #edit-speakers-btn,
-        .local-file-mode #reprocess-btn,
-        .local-file-mode #back-to-list-btn {
-            display: none !important;
-        }
+      .t {
+        display: inline-block;
+      }
+      #video-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        background: #efe7dd;
+        z-index: 1000;
+        padding: 12px 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #video-header .page-title {
+        text-align: center;
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      .header-main {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 16px;
+      }
+      .media-wrapper {
+        flex: 0 1 auto;
+        display: flex;
+        justify-content: flex-start;
+      }
+      #player {
+        max-height: min(28vh, 320px);
+        width: clamp(280px, 40vw, 540px);
+        height: auto;
+        border: none;
+      }
+      #content {
+        margin-top: max(calc(28vh + 120px), 360px);
+      }
+      .timestamp {
+        color: #666;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .speaker-name {
+        font-weight: bold;
+        margin-right: 8px;
+      }
 
-        /* When editing, hide all buttons except Save Changes */
-    .editing .edit-controls button { display: none !important; }
-    .editing .edit-controls #save-btn { display: inline-block !important; }
+      /* Edit mode styles */
+      .edit-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        justify-content: flex-start;
+        align-items: stretch;
+        margin: 0;
+      }
+      .edit-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 0;
+        font-size: 14px;
+        width: 100%;
+        text-align: left;
+      }
+      .edit-btn:hover {
+        background: #0056b3;
+      }
+      .edit-btn.active {
+        background: #28a745;
+      }
+      .edit-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+      .save-status {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .save-success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .save-error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      /* Editable transcript styles */
+      .transcript-segment {
+        position: relative;
+      }
+      .transcript-segment.editable {
+        border: 1px dashed #007bff;
+        border-radius: 4px;
+        margin: 2px 0;
+      }
+      .transcript-segment.editable:hover {
+        background-color: #f8f9fa;
+      }
+      .transcript-segment.editing {
+        background-color: #fff3cd;
+        border: 2px solid #ffc107;
+      }
+      .transcript-text {
+        cursor: text;
+      }
+      .transcript-segment.editable .transcript-text {
+        min-height: 1.2em;
+        padding: 2px 4px;
+        border-radius: 2px;
+      }
+      .transcript-text[contenteditable="true"] {
+        outline: none;
+        background: #fffbf0;
+        border: 1px solid #ffc107;
+        border-radius: 2px;
+      }
+
+      /* Hide server-dependent buttons when viewing as local file */
+      .local-file-mode #edit-mode-btn,
+      .local-file-mode #edit-speakers-btn,
+      .local-file-mode #reprocess-btn,
+      .local-file-mode #back-to-list-btn {
+        display: none !important;
+      }
+
+      /* When editing, hide all buttons except Save Changes */
+      .editing .edit-controls button {
+        display: none !important;
+      }
+      .editing .edit-controls #save-btn {
+        display: inline-block !important;
+      }
     </style>
-</head>
+  </head>
   <body>
-   
     <div id="video-header" class="html-only">
-    <h2 style="text-align: center; margin: 5px 0;">test-audio</h2>
-    <p style="text-align: center; margin: 5px 0; font-style: italic;">Click on a word to jump to that section of the video</p>
-    <video id="player" style="border:none;" width="575" height="240" preload controls>
-      <source src="test-audio.mp3" type="video/mp4; codecs=avc1.42E01E,mp4a.40.2" />
-    </video>
-    
-    <div class="edit-controls">
-      <button id="edit-mode-btn" class="edit-btn" onclick="toggleEditMode()">📝 Edit Mode</button>
-      <button id="edit-speakers-btn" class="edit-btn" onclick="editSpeakers()">👥 Edit Speakers</button>
-      <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">🔄 Reprocess</button>
-      <button id="back-to-list-btn" class="edit-btn" onclick="goBackToList()">📋 View All Files</button>
-      <button id="save-btn" class="edit-btn" onclick="saveChanges()" style="display: none;">💾 Save Changes</button>
-      <button id="cancel-btn" class="edit-btn" onclick="cancelEdits()" style="display: none;">❌ Cancel</button>
-      <span id="save-status" class="save-status"></span>
-    </div>
+      <h2 class="page-title">test-audio</h2>
+      <div class="header-main">
+        <div class="edit-controls">
+          <button
+            id="edit-mode-btn"
+            class="edit-btn"
+            onclick="toggleEditMode()"
+          >
+            📝 Edit Mode
+          </button>
+          <button
+            id="edit-speakers-btn"
+            class="edit-btn"
+            onclick="editSpeakers()"
+          >
+            👥 Edit Speakers
+          </button>
+          <button id="reprocess-btn" class="edit-btn" onclick="reprocessFile()">
+            🔄 Reprocess
+          </button>
+          <button
+            id="back-to-list-btn"
+            class="edit-btn"
+            onclick="goBackToList()"
+          >
+            📋 View All Files
+          </button>
+          <button
+            id="save-btn"
+            class="edit-btn"
+            onclick="saveChanges()"
+            style="display: none"
+          >
+            💾 Save Changes
+          </button>
+          <button
+            id="cancel-btn"
+            class="edit-btn"
+            onclick="cancelEdits()"
+            style="display: none"
+          >
+            ❌ Cancel
+          </button>
+          <span id="save-status" class="save-status"></span>
+        </div>
+        <div class="media-wrapper">
+          <video id="player" preload controls>
+            <source
+              src="test-audio.mp3"
+              type="video/mp4; codecs=avc1.42E01E,mp4a.40.2"
+            />
+          </video>
+        </div>
+      </div>
     </div>
     <div id="content">
-  <div class="e" style="background-color: white">
-  
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_00</span><br>
-      <div class="transcript-segment" data-start="0.0" data-end="2.9749999999999996" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="0.0" data-vtt-end="2.92" data-caption-idx="0">
-        <span class="timestamp">[00:00:00.00] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:00.00" class="lt" onclick="jumptoTime(0)">Okay, so today we're diving into something pretty critical</a></span>
+      <div class="e" style="background-color: white">
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_01"
+          data-speaker-name="Speaker 2"
+          style="background-color: #e1ffc7"
+        >
+          <div
+            class="transcript-segment"
+            data-start="0.0"
+            data-end="2.9749999999999996"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="2.92"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:00.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:00.00" class="lt" onclick="jumptoTime(0)"
+                >Okay, so today we're diving into something pretty critical</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="2.9749999999999996"
+            data-end="6.095000000000001"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="2.92"
+            data-vtt-end="6.04"
+            data-caption-idx="1"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:03.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:02.97" class="lt" onclick="jumptoTime(2)"
+                >in the modern tech landscape.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="6.095000000000001"
+            data-end="8.655"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="6.04"
+            data-vtt-end="8.6"
+            data-caption-idx="2"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:06.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:06.10" class="lt" onclick="jumptoTime(6)"
+                >How do you get really good AI transcription,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="8.655"
+            data-end="11.094999999999999"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="8.6"
+            data-vtt-end="11.04"
+            data-caption-idx="3"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:08.7] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:08.65" class="lt" onclick="jumptoTime(8)"
+                >fast, accurate, but crucially,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="11.094999999999999"
+            data-end="13.135"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="11.04"
+            data-vtt-end="13.08"
+            data-caption-idx="4"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:11.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:11.09" class="lt" onclick="jumptoTime(11)"
+                >without sending potentially sensitive stuff,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="13.135"
+            data-end="16.215"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="13.08"
+            data-vtt-end="16.16"
+            data-caption-idx="5"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:13.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:13.13" class="lt" onclick="jumptoTime(13)"
+                >audio video up to some third party cloud service?</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="16.215"
+            data-end="18.615"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="16.16"
+            data-vtt-end="18.56"
+            data-caption-idx="6"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:16.2] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:16.21" class="lt" onclick="jumptoTime(16)"
+                >This is our deep dive into the documentation</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="18.615"
+            data-end="21.294999999999998"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="18.56"
+            data-vtt-end="21.24"
+            data-caption-idx="7"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:18.6] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:18.61" class="lt" onclick="jumptoTime(18)"
+                >for a tool set called Transcribe with Whisper.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="21.294999999999998"
+            data-end="22.855"
+            data-speaker="Speaker 2"
+            data-vtt-file="0.vtt"
+            data-vtt-start="21.24"
+            data-vtt-end="22.8"
+            data-caption-idx="8"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:21.3] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:21.29" class="lt" onclick="jumptoTime(21)"
+                >It's all about self-hosting.</a
+              ></span
+            >
+          </div>
+        </div>
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_00"
+          data-speaker-name="Speaker 1"
+          style="background-color: lightgray"
+        >
+          <div
+            class="transcript-segment"
+            data-start="23.039"
+            data-end="29.119"
+            data-speaker="Speaker 1"
+            data-vtt-file="1.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="6.08"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:23.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:23.04" class="lt" onclick="jumptoTime(23)"
+                >Exactly. It's aiming to solve that chord data sovereignty
+                problem, keeping your data completely</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="29.119"
+            data-end="33.039"
+            data-speaker="Speaker 1"
+            data-vtt-file="1.vtt"
+            data-vtt-start="6.08"
+            data-vtt-end="10.0"
+            data-caption-idx="1"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:29.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:29.12" class="lt" onclick="jumptoTime(29)"
+                >under your control. And what's really interesting here, the
+                source material, the README,</a
+              ></span
+            >
+          </div>
+        </div>
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_01"
+          data-speaker-name="Speaker 2"
+          style="background-color: #e1ffc7"
+        >
+          <div
+            class="transcript-segment"
+            data-start="27.764"
+            data-end="28.264"
+            data-speaker="Speaker 2"
+            data-vtt-file="2.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="0.5"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:27.8] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:27.76" class="lt" onclick="jumptoTime(27)"
+                >Hmm.</a
+              ></span
+            >
+          </div>
+        </div>
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_00"
+          data-speaker-name="Speaker 1"
+          style="background-color: lightgray"
+        >
+          <div
+            class="transcript-segment"
+            data-start="33.552"
+            data-end="37.952"
+            data-speaker="Speaker 1"
+            data-vtt-file="3.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="4.4"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:33.6] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:33.55" class="lt" onclick="jumptoTime(33)"
+                >States their goal pretty boldly. They want to make this
+                advanced AI accessible,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="37.952"
+            data-end="42.512"
+            data-speaker="Speaker 1"
+            data-vtt-file="3.vtt"
+            data-vtt-start="4.4"
+            data-vtt-end="8.96"
+            data-caption-idx="1"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:38.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:37.95" class="lt" onclick="jumptoTime(37)"
+                >even if your technical skill is basically just installing
+                programs and clicking buttons.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="42.512"
+            data-end="50.352000000000004"
+            data-speaker="Speaker 1"
+            data-vtt-file="3.vtt"
+            data-vtt-start="8.96"
+            data-vtt-end="16.8"
+            data-caption-idx="2"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:42.5] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:42.51" class="lt" onclick="jumptoTime(42)"
+                >That's their quote, more or less.</a
+              ></span
+            >
+          </div>
+        </div>
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_01"
+          data-speaker-name="Speaker 2"
+          style="background-color: #e1ffc7"
+        >
+          <div
+            class="transcript-segment"
+            data-start="43.981"
+            data-end="45.661"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="1.68"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:44.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:43.98" class="lt" onclick="jumptoTime(43)"
+                >Hmm, that is ambitious.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="45.661"
+            data-end="46.661"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="1.68"
+            data-vtt-end="2.68"
+            data-caption-idx="1"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:45.7] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:45.66" class="lt" onclick="jumptoTime(45)"
+                >Especially with AI tools,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="46.661"
+            data-end="49.061"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="2.68"
+            data-vtt-end="5.08"
+            data-caption-idx="2"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:46.7] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:46.66" class="lt" onclick="jumptoTime(46)"
+                >they often have these really complex dependencies, right?</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="49.061"
+            data-end="52.1"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="5.08"
+            data-vtt-end="8.119"
+            data-caption-idx="3"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:49.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:49.06" class="lt" onclick="jumptoTime(49)"
+                >So does the documentation actually show they pulled it off,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="52.1"
+            data-end="54.101"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="8.119"
+            data-vtt-end="10.12"
+            data-caption-idx="4"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:52.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:52.10" class="lt" onclick="jumptoTime(52)"
+                >hiding the complexity while, you know,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="54.101"
+            data-end="55.941"
+            data-speaker="Speaker 2"
+            data-vtt-file="4.vtt"
+            data-vtt-start="10.12"
+            data-vtt-end="11.96"
+            data-caption-idx="5"
+          >
+            <span class="speaker-name">Speaker 2: </span>
+            <span class="timestamp">[0:00:54.1] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:54.10" class="lt" onclick="jumptoTime(54)"
+                >keeping that privacy promise for the data?</a
+              ></span
+            >
+          </div>
+        </div>
+        <div
+          class="e"
+          data-speaker-id="SPEAKER_00"
+          data-speaker-name="Speaker 1"
+          style="background-color: lightgray"
+        >
+          <div
+            class="transcript-segment"
+            data-start="55.962"
+            data-end="57.482000000000006"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="0.0"
+            data-vtt-end="1.52"
+            data-caption-idx="0"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:56.0] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:55.96" class="lt" onclick="jumptoTime(55)"
+                >It seems like they really have.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="57.482000000000006"
+            data-end="59.522000000000006"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="1.52"
+            data-vtt-end="3.56"
+            data-caption-idx="1"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:57.5] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:57.48" class="lt" onclick="jumptoTime(57)"
+                >The unique part is how it all fits together.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="59.522000000000006"
+            data-end="61.44200000000001"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="3.56"
+            data-vtt-end="5.48"
+            data-caption-idx="2"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:00:59.5] </span>
+            <span class="transcript-text"
+              ><a href="#00:00:59.52" class="lt" onclick="jumptoTime(59)"
+                >It's not just using a powerful model</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="61.44200000000001"
+            data-end="64.44200000000001"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="5.48"
+            data-vtt-end="8.48"
+            data-caption-idx="3"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:01.4] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:01.44" class="lt" onclick="jumptoTime(61)"
+                >like say, faster whisper for the accuracy.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="64.44200000000001"
+            data-end="68.72200000000001"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="8.48"
+            data-vtt-end="12.76"
+            data-caption-idx="4"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:04.4] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:04.44" class="lt" onclick="jumptoTime(64)"
+                >It intelligently bundles that with other vital things,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="68.72200000000001"
+            data-end="71.44200000000001"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="12.76"
+            data-vtt-end="15.48"
+            data-caption-idx="5"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:08.7] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:08.72" class="lt" onclick="jumptoTime(68)"
+                >like speaker separation, knowing who spoke when,</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="71.44200000000001"
+            data-end="73.322"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="15.48"
+            data-vtt-end="17.36"
+            data-caption-idx="6"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:11.4] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:11.44" class="lt" onclick="jumptoTime(71)"
+                >and making sure the output plays nice</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="73.322"
+            data-end="77.602"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="17.36"
+            data-vtt-end="21.64"
+            data-caption-idx="7"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:13.3] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:13.32" class="lt" onclick="jumptoTime(73)"
+                >with research software or analytical tools.</a
+              ></span
+            >
+          </div>
+          <div
+            class="transcript-segment"
+            data-start="77.602"
+            data-end="79.362"
+            data-speaker="Speaker 1"
+            data-vtt-file="5.vtt"
+            data-vtt-start="21.64"
+            data-vtt-end="23.4"
+            data-caption-idx="8"
+          >
+            <span class="speaker-name">Speaker 1: </span>
+            <span class="timestamp">[0:01:17.6] </span>
+            <span class="transcript-text"
+              ><a href="#00:01:17.60" class="lt" onclick="jumptoTime(77)"
+                >Think beyond just basic text.</a
+              ></span
+            >
+          </div>
+        </div>
       </div>
-      <div class="transcript-segment" data-start="2.9749999999999996" data-end="6.095000000000001" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="2.92" data-vtt-end="6.04" data-caption-idx="1">
-        <span class="timestamp">[00:00:02.97] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:02.97" class="lt" onclick="jumptoTime(2)">in the modern tech landscape.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="6.095000000000001" data-end="8.655" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="6.04" data-vtt-end="8.6" data-caption-idx="2">
-        <span class="timestamp">[00:00:06.10] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:06.10" class="lt" onclick="jumptoTime(6)">How do you get really good AI transcription,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="8.655" data-end="11.094999999999999" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="8.6" data-vtt-end="11.04" data-caption-idx="3">
-        <span class="timestamp">[00:00:08.65] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:08.65" class="lt" onclick="jumptoTime(8)">fast, accurate, but crucially,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="11.094999999999999" data-end="13.135" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="11.04" data-vtt-end="13.08" data-caption-idx="4">
-        <span class="timestamp">[00:00:11.09] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:11.09" class="lt" onclick="jumptoTime(11)">without sending potentially sensitive stuff,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="13.135" data-end="16.215" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="13.08" data-vtt-end="16.16" data-caption-idx="5">
-        <span class="timestamp">[00:00:13.13] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:13.13" class="lt" onclick="jumptoTime(13)">audio video up to some third party cloud service?</a></span>
-      </div>
-      <div class="transcript-segment" data-start="16.215" data-end="18.615" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="16.16" data-vtt-end="18.56" data-caption-idx="6">
-        <span class="timestamp">[00:00:16.21] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:16.21" class="lt" onclick="jumptoTime(16)">This is our deep dive into the documentation</a></span>
-      </div>
-      <div class="transcript-segment" data-start="18.615" data-end="21.294999999999998" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="18.56" data-vtt-end="21.24" data-caption-idx="7">
-        <span class="timestamp">[00:00:18.61] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:18.61" class="lt" onclick="jumptoTime(18)">for a tool set called Transcribe with Whisper.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="21.294999999999998" data-end="22.855" data-speaker="SPEAKER_00" data-vtt-file="0.vtt" data-vtt-start="21.24" data-vtt-end="22.8" data-caption-idx="8">
-        <span class="timestamp">[00:00:21.29] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:21.29" class="lt" onclick="jumptoTime(21)">It's all about self-hosting.</a></span>
-      </div>
+      <!-- end of class e and speaker segments -->
     </div>
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_01</span><br>
-      <div class="transcript-segment" data-start="23.039" data-end="29.119" data-speaker="SPEAKER_01" data-vtt-file="1.vtt" data-vtt-start="0.0" data-vtt-end="6.08" data-caption-idx="0">
-        <span class="timestamp">[00:00:23.04] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:23.04" class="lt" onclick="jumptoTime(23)">Exactly. It's aiming to solve that chord data sovereignty problem, keeping your data completely</a></span>
-      </div>
-      <div class="transcript-segment" data-start="29.119" data-end="33.039" data-speaker="SPEAKER_01" data-vtt-file="1.vtt" data-vtt-start="6.08" data-vtt-end="10.0" data-caption-idx="1">
-        <span class="timestamp">[00:00:29.12] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:29.12" class="lt" onclick="jumptoTime(29)">under your control. And what's really interesting here, the source material, the README,</a></span>
-      </div>
-    </div>
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_00</span><br>
-      <div class="transcript-segment" data-start="27.764" data-end="28.264" data-speaker="SPEAKER_00" data-vtt-file="2.vtt" data-vtt-start="0.0" data-vtt-end="0.5" data-caption-idx="0">
-        <span class="timestamp">[00:00:27.76] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:27.76" class="lt" onclick="jumptoTime(27)">Hmm.</a></span>
-      </div>
-    </div>
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_01</span><br>
-      <div class="transcript-segment" data-start="33.552" data-end="37.952" data-speaker="SPEAKER_01" data-vtt-file="3.vtt" data-vtt-start="0.0" data-vtt-end="4.4" data-caption-idx="0">
-        <span class="timestamp">[00:00:33.55] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:33.55" class="lt" onclick="jumptoTime(33)">States their goal pretty boldly. They want to make this advanced AI accessible,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="37.952" data-end="42.512" data-speaker="SPEAKER_01" data-vtt-file="3.vtt" data-vtt-start="4.4" data-vtt-end="8.96" data-caption-idx="1">
-        <span class="timestamp">[00:00:37.95] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:37.95" class="lt" onclick="jumptoTime(37)">even if your technical skill is basically just installing programs and clicking buttons.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="42.512" data-end="50.352000000000004" data-speaker="SPEAKER_01" data-vtt-file="3.vtt" data-vtt-start="8.96" data-vtt-end="16.8" data-caption-idx="2">
-        <span class="timestamp">[00:00:42.51] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:42.51" class="lt" onclick="jumptoTime(42)">That's their quote, more or less.</a></span>
-      </div>
-    </div>
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_00</span><br>
-      <div class="transcript-segment" data-start="43.981" data-end="45.661" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="0.0" data-vtt-end="1.68" data-caption-idx="0">
-        <span class="timestamp">[00:00:43.98] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:43.98" class="lt" onclick="jumptoTime(43)">Hmm, that is ambitious.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="45.661" data-end="46.661" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="1.68" data-vtt-end="2.68" data-caption-idx="1">
-        <span class="timestamp">[00:00:45.66] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:45.66" class="lt" onclick="jumptoTime(45)">Especially with AI tools,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="46.661" data-end="49.061" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="2.68" data-vtt-end="5.08" data-caption-idx="2">
-        <span class="timestamp">[00:00:46.66] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:46.66" class="lt" onclick="jumptoTime(46)">they often have these really complex dependencies, right?</a></span>
-      </div>
-      <div class="transcript-segment" data-start="49.061" data-end="52.1" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="5.08" data-vtt-end="8.119" data-caption-idx="3">
-        <span class="timestamp">[00:00:49.06] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:49.06" class="lt" onclick="jumptoTime(49)">So does the documentation actually show they pulled it off,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="52.1" data-end="54.101" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="8.119" data-vtt-end="10.12" data-caption-idx="4">
-        <span class="timestamp">[00:00:52.10] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:52.10" class="lt" onclick="jumptoTime(52)">hiding the complexity while, you know,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="54.101" data-end="55.941" data-speaker="SPEAKER_00" data-vtt-file="4.vtt" data-vtt-start="10.12" data-vtt-end="11.96" data-caption-idx="5">
-        <span class="timestamp">[00:00:54.10] </span>
-        <span class="speaker-name">SPEAKER_00: </span>
-        <span class="transcript-text"><a href="#00:00:54.10" class="lt" onclick="jumptoTime(54)">keeping that privacy promise for the data?</a></span>
-      </div>
-    </div>
-    <div class="e" style="background-color:white"><span style="color:orange">SPEAKER_01</span><br>
-      <div class="transcript-segment" data-start="55.962" data-end="57.482000000000006" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="0.0" data-vtt-end="1.52" data-caption-idx="0">
-        <span class="timestamp">[00:00:55.96] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:55.96" class="lt" onclick="jumptoTime(55)">It seems like they really have.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="57.482000000000006" data-end="59.522000000000006" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="1.52" data-vtt-end="3.56" data-caption-idx="1">
-        <span class="timestamp">[00:00:57.48] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:57.48" class="lt" onclick="jumptoTime(57)">The unique part is how it all fits together.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="59.522000000000006" data-end="61.44200000000001" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="3.56" data-vtt-end="5.48" data-caption-idx="2">
-        <span class="timestamp">[00:00:59.52] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:00:59.52" class="lt" onclick="jumptoTime(59)">It's not just using a powerful model</a></span>
-      </div>
-      <div class="transcript-segment" data-start="61.44200000000001" data-end="64.44200000000001" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="5.48" data-vtt-end="8.48" data-caption-idx="3">
-        <span class="timestamp">[00:01:01.44] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:01.44" class="lt" onclick="jumptoTime(61)">like say, faster whisper for the accuracy.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="64.44200000000001" data-end="68.72200000000001" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="8.48" data-vtt-end="12.76" data-caption-idx="4">
-        <span class="timestamp">[00:01:04.44] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:04.44" class="lt" onclick="jumptoTime(64)">It intelligently bundles that with other vital things,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="68.72200000000001" data-end="71.44200000000001" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="12.76" data-vtt-end="15.48" data-caption-idx="5">
-        <span class="timestamp">[00:01:08.72] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:08.72" class="lt" onclick="jumptoTime(68)">like speaker separation, knowing who spoke when,</a></span>
-      </div>
-      <div class="transcript-segment" data-start="71.44200000000001" data-end="73.322" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="15.48" data-vtt-end="17.36" data-caption-idx="6">
-        <span class="timestamp">[00:01:11.44] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:11.44" class="lt" onclick="jumptoTime(71)">and making sure the output plays nice</a></span>
-      </div>
-      <div class="transcript-segment" data-start="73.322" data-end="77.602" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="17.36" data-vtt-end="21.64" data-caption-idx="7">
-        <span class="timestamp">[00:01:13.32] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:13.32" class="lt" onclick="jumptoTime(73)">with research software or analytical tools.</a></span>
-      </div>
-      <div class="transcript-segment" data-start="77.602" data-end="79.362" data-speaker="SPEAKER_01" data-vtt-file="5.vtt" data-vtt-start="21.64" data-vtt-end="23.4" data-caption-idx="8">
-        <span class="timestamp">[00:01:17.60] </span>
-        <span class="speaker-name">SPEAKER_01: </span>
-        <span class="transcript-text"><a href="#00:01:17.60" class="lt" onclick="jumptoTime(77)">Think beyond just basic text.</a></span>
-      </div>
-    </div>
-  </div> <!-- end of class e and speaker segments -->
-    </div> <!-- end of content -->
+    <!-- end of content -->
 
     <script>
-      console.log('Loading video highlight script...');
-      
+      console.log("Loading video highlight script...");
+
       // Detect if viewing as local file and hide server-dependent buttons
-      if (window.location.protocol === 'file:') {
-          console.log('Detected local file mode - hiding server-dependent buttons');
-          document.body.classList.add('local-file-mode');
+      if (window.location.protocol === "file:") {
+        console.log(
+          "Detected local file mode - hiding server-dependent buttons"
+        );
+        document.body.classList.add("local-file-mode");
       }
-      
-      function jumptoTime(time){
-          var v = document.getElementsByTagName('video')[0];
-          // Jump directly to the exact time (no offset)
-          console.log("jumping to time:", time);
-          if (v) {
-              v.currentTime = time;
-          }
+
+      function jumptoTime(time) {
+        var v = document.getElementsByTagName("video")[0];
+        // Jump directly to the exact time (no offset)
+        console.log("jumping to time:", time);
+        if (v) {
+          v.currentTime = time;
+        }
       }
 
       // Track current segment highlighting
       var currentHighlighted = null;
 
       function highlightCurrentSegment() {
-          var v = document.getElementsByTagName('video')[0];
-          if (!v) {
-              console.log('Video element not found');
-              return;
+        var v = document.getElementsByTagName("video")[0];
+        if (!v) {
+          console.log("Video element not found");
+          return;
+        }
+
+        var currentTime = v.currentTime;
+        // Use the current time directly (no offset)
+        console.log("Current video time:", currentTime);
+
+        // Find all clickable transcript segments
+        var segments = document.querySelectorAll("a.lt[onclick]");
+        console.log("Found segments:", segments.length);
+
+        var targetSegment = null;
+
+        // Find the segment that should be highlighted based on adjusted video time
+        for (var i = 0; i < segments.length; i++) {
+          var onclick = segments[i].getAttribute("onclick");
+          if (!onclick) continue;
+
+          var match = onclick.match(/jumptoTime\((\d+)\)/);
+          if (!match) continue;
+
+          var segmentTime = parseInt(match[1]);
+
+          // Check if this is the current or most recent segment
+          if (segmentTime <= currentTime) {
+            targetSegment = segments[i];
+          } else {
+            break; // segments are in chronological order
           }
-          
-          var currentTime = v.currentTime;
-          // Use the current time directly (no offset)
-          console.log('Current video time:', currentTime);
-          
-          // Find all clickable transcript segments
-          var segments = document.querySelectorAll('a.lt[onclick]');
-          console.log('Found segments:', segments.length);
-          
-          var targetSegment = null;
-          
-          // Find the segment that should be highlighted based on adjusted video time
-          for (var i = 0; i < segments.length; i++) {
-              var onclick = segments[i].getAttribute('onclick');
-              if (!onclick) continue;
-              
-              var match = onclick.match(/jumptoTime\((\d+)\)/);
-              if (!match) continue;
-              
-              var segmentTime = parseInt(match[1]);
-              
-              // Check if this is the current or most recent segment
-              if (segmentTime <= currentTime) {
-                  targetSegment = segments[i];
-              } else {
-                  break; // segments are in chronological order
-              }
+        }
+
+        // Only update highlighting if we're switching to a different segment
+        if (targetSegment !== currentHighlighted) {
+          // Remove previous highlighting
+          if (currentHighlighted) {
+            currentHighlighted.style.backgroundColor = "";
+            currentHighlighted.style.fontWeight = "";
+            console.log("Removed previous highlight");
           }
-          
-          // Only update highlighting if we're switching to a different segment
-          if (targetSegment !== currentHighlighted) {
-              // Remove previous highlighting
-              if (currentHighlighted) {
-                  currentHighlighted.style.backgroundColor = '';
-                  currentHighlighted.style.fontWeight = '';
-                  console.log('Removed previous highlight');
-              }
-              
-              // Highlight new segment
-              if (targetSegment) {
-                  targetSegment.style.backgroundColor = '#ffeb3b';
-                  targetSegment.style.fontWeight = 'bold';
-                  currentHighlighted = targetSegment;
-                  console.log('Highlighted new segment:', targetSegment.textContent.substring(0, 50) + '...');
-                  
-                  // Scroll to keep current segment visible
-                  targetSegment.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center'
-                  });
-              }
+
+          // Highlight new segment
+          if (targetSegment) {
+            targetSegment.style.backgroundColor = "#ffeb3b";
+            targetSegment.style.fontWeight = "bold";
+            currentHighlighted = targetSegment;
+            console.log(
+              "Highlighted new segment:",
+              targetSegment.textContent.substring(0, 50) + "..."
+            );
+
+            // Scroll to keep current segment visible
+            targetSegment.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
           }
+        }
       }
 
       // Initialize when DOM is ready
       function initializeVideoTracking() {
-          console.log('Initializing video tracking...');
-          var v = document.getElementsByTagName('video')[0];
-          if (v) {
-              console.log('Video found, adding event listeners');
-              // Update highlighting as video plays
-              v.addEventListener('timeupdate', highlightCurrentSegment);
-              
-              // Also update when user seeks
-              v.addEventListener('seeked', highlightCurrentSegment);
-              
-              // Initial highlight check
-              setTimeout(highlightCurrentSegment, 100);
-          } else {
-              console.log('Video not found, retrying in 500ms');
-              setTimeout(initializeVideoTracking, 500);
-          }
+        console.log("Initializing video tracking...");
+        var v = document.getElementsByTagName("video")[0];
+        if (v) {
+          console.log("Video found, adding event listeners");
+          // Update highlighting as video plays
+          v.addEventListener("timeupdate", highlightCurrentSegment);
+
+          // Also update when user seeks
+          v.addEventListener("seeked", highlightCurrentSegment);
+
+          // Initial highlight check
+          setTimeout(highlightCurrentSegment, 100);
+        } else {
+          console.log("Video not found, retrying in 500ms");
+          setTimeout(initializeVideoTracking, 500);
+        }
       }
-      
+
       // Edit mode functionality
       let editMode = false;
       let originalContent = {};
-      
+
       function toggleEditMode() {
-          editMode = !editMode;
-          const editButton = document.querySelector('#edit-mode-btn');
-          const saveButton = document.querySelector('#save-btn');
-          const cancelButton = document.querySelector('#cancel-btn');
-          const body = document.body;
-          const segments = document.querySelectorAll('.transcript-segment');
-          
-          if (editMode) {
-              // Enter edit mode
-              body.classList.add('editing');
-              editButton.textContent = '📝 Editing...';
-              // Let CSS control button visibility in edit mode
-              saveButton.style.display = 'inline-block';
-              // Intentionally keep cancel hidden; only Save should show while editing
-              
-              // Store original content and make segments editable
-              segments.forEach(segment => {
-                  // Store only the transcript text content, not timestamp/speaker
-                  const transcriptTextSpan = segment.querySelector('.transcript-text');
-                  originalContent[segment.dataset.start] = transcriptTextSpan ? transcriptTextSpan.textContent : '';
-                  
-                  // Make only the transcript-text span editable, not the whole segment
-                  const textSpan = segment.querySelector('.transcript-text');
-                  if (textSpan) {
-                      textSpan.contentEditable = true;
-                  }
-                  segment.classList.add('editable');
-              });
-          } else {
-              // Exit edit mode
-              body.classList.remove('editing');
-              editButton.textContent = '📝 Edit Mode';
-              saveButton.style.display = 'none';
-              // Keep cancel hidden
-              
-              // Make segments non-editable
-              segments.forEach(segment => {
-                  const textSpan = segment.querySelector('.transcript-text');
-                  if (textSpan) {
-                      textSpan.contentEditable = false;
-                  }
-                  segment.classList.remove('editable');
-              });
-              
-              originalContent = {};
-          }
+        editMode = !editMode;
+        const editButton = document.querySelector("#edit-mode-btn");
+        const saveButton = document.querySelector("#save-btn");
+        const cancelButton = document.querySelector("#cancel-btn");
+        const body = document.body;
+        const segments = document.querySelectorAll(".transcript-segment");
+
+        if (editMode) {
+          // Enter edit mode
+          body.classList.add("editing");
+          editButton.textContent = "📝 Editing...";
+          // Let CSS control button visibility in edit mode
+          saveButton.style.display = "inline-block";
+          // Intentionally keep cancel hidden; only Save should show while editing
+
+          // Store original content and make segments editable
+          segments.forEach((segment) => {
+            // Store only the transcript text content, not timestamp/speaker
+            const transcriptTextSpan =
+              segment.querySelector(".transcript-text");
+            originalContent[segment.dataset.start] = transcriptTextSpan
+              ? transcriptTextSpan.textContent
+              : "";
+
+            // Make only the transcript-text span editable, not the whole segment
+            const textSpan = segment.querySelector(".transcript-text");
+            if (textSpan) {
+              textSpan.contentEditable = true;
+            }
+            segment.classList.add("editable");
+          });
+        } else {
+          // Exit edit mode
+          body.classList.remove("editing");
+          editButton.textContent = "📝 Edit Mode";
+          saveButton.style.display = "none";
+          // Keep cancel hidden
+
+          // Make segments non-editable
+          segments.forEach((segment) => {
+            const textSpan = segment.querySelector(".transcript-text");
+            if (textSpan) {
+              textSpan.contentEditable = false;
+            }
+            segment.classList.remove("editable");
+          });
+
+          originalContent = {};
+        }
       }
-      
+
       function saveChanges() {
-          const segments = document.querySelectorAll('.transcript-segment');
-          const changes = [];
-          
-          segments.forEach(segment => {
-              const start = segment.dataset.start;
-              const end = segment.dataset.end;
-              const speaker = segment.dataset.speaker || '';
-              const vttFile = segment.dataset.vttFile || '';
-              const vttStart = segment.dataset.vttStart || '';
-              const vttEnd = segment.dataset.vttEnd || '';
-              const captionIdx = segment.dataset.captionIdx || '';
-              
-              // Extract only the text from the transcript-text span, not the timestamp and speaker
-              const transcriptTextSpan = segment.querySelector('.transcript-text');
-              const newText = transcriptTextSpan ? transcriptTextSpan.textContent.trim() : '';
-              const originalText = originalContent[start] || '';
-              
-              if (newText !== originalText) {
-                  changes.push({
-                      // absolute timings are still included for UI uses, but server will rely on VTT-local hints
-                      start: start,
-                      end: end,
-                      speaker: speaker,
-                      text: newText,
-                      originalText: originalText,
-                      vttFile: vttFile,
-                      vttStart: vttStart,
-                      vttEnd: vttEnd,
-                      captionIdx: captionIdx
-                  });
-              }
-          });
-          
-          if (changes.length === 0) {
-              alert('No changes detected.');
-              toggleEditMode();
-              return;
+        const segments = document.querySelectorAll(".transcript-segment");
+        const changes = [];
+
+        segments.forEach((segment) => {
+          const start = segment.dataset.start;
+          const end = segment.dataset.end;
+          const speaker = segment.dataset.speaker || "";
+          const vttFile = segment.dataset.vttFile || "";
+          const vttStart = segment.dataset.vttStart || "";
+          const vttEnd = segment.dataset.vttEnd || "";
+          const captionIdx = segment.dataset.captionIdx || "";
+
+          // Extract only the text from the transcript-text span, not the timestamp and speaker
+          const transcriptTextSpan = segment.querySelector(".transcript-text");
+          const newText = transcriptTextSpan
+            ? transcriptTextSpan.textContent.trim()
+            : "";
+          const originalText = originalContent[start] || "";
+
+          if (newText !== originalText) {
+            changes.push({
+              // absolute timings are still included for UI uses, but server will rely on VTT-local hints
+              start: start,
+              end: end,
+              speaker: speaker,
+              text: newText,
+              originalText: originalText,
+              vttFile: vttFile,
+              vttStart: vttStart,
+              vttEnd: vttEnd,
+              captionIdx: captionIdx,
+            });
           }
-          
-          // Send changes to server
-          const videoFile = window.location.pathname.split('/').pop().replace('.html', '');
-          
-          fetch(`/save_transcript_edits/${videoFile}`, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ changes: changes })
+        });
+
+        if (changes.length === 0) {
+          alert("No changes detected.");
+          toggleEditMode();
+          return;
+        }
+
+        // Send changes to server
+        const videoFile = window.location.pathname
+          .split("/")
+          .pop()
+          .replace(".html", "");
+
+        fetch(`/save_transcript_edits/${videoFile}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ changes: changes }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              alert(
+                'Changes saved to VTT files! To see your changes in the HTML, click "Reprocess".'
+              );
+              toggleEditMode(); // Exit edit mode
+            } else {
+              alert("Error saving changes: " + (data.error || "Unknown error"));
+            }
           })
-          .then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  alert('Changes saved to VTT files! To see your changes in the HTML, click "Reprocess".');
-                  toggleEditMode(); // Exit edit mode
-              } else {
-                  alert('Error saving changes: ' + (data.error || 'Unknown error'));
-              }
-          })
-          .catch(error => {
-              console.error('Error saving changes:', error);
-              alert('Error saving changes: ' + error.message);
+          .catch((error) => {
+            console.error("Error saving changes:", error);
+            alert("Error saving changes: " + error.message);
           });
       }
-      
+
       function cancelEdits() {
-          if (confirm('Are you sure you want to cancel all edits?')) {
-              const segments = document.querySelectorAll('.transcript-segment');
-              
-              // Restore original content
-              segments.forEach(segment => {
-                  const start = segment.dataset.start;
-                  if (originalContent[start]) {
-                      const textSpan = segment.querySelector('.transcript-text');
-                      if (textSpan) {
-                          textSpan.textContent = originalContent[start];
-                      }
-                  }
-              });
-              
-              toggleEditMode();
-          }
+        if (confirm("Are you sure you want to cancel all edits?")) {
+          const segments = document.querySelectorAll(".transcript-segment");
+
+          // Restore original content
+          segments.forEach((segment) => {
+            const start = segment.dataset.start;
+            if (originalContent[start]) {
+              const textSpan = segment.querySelector(".transcript-text");
+              if (textSpan) {
+                textSpan.textContent = originalContent[start];
+              }
+            }
+          });
+
+          toggleEditMode();
+        }
       }
-      
+
       function reprocessFile() {
-          if (confirm('This will reprocess the current video file. This may take several minutes. Continue?')) {
-              // Extract filename from current URL or use a data attribute
-              const videoElement = document.querySelector('video source');
-              if (videoElement) {
-                  const videoSrc = videoElement.src;
-                  const filename = videoSrc.substring(videoSrc.lastIndexOf('/') + 1);
-                  
-                  // Create a form and submit it like the working version on the main page
-                  const form = document.createElement('form');
-                  form.method = 'post';
-                  form.action = '/rerun';
-                  
-                  const input = document.createElement('input');
-                  input.type = 'hidden';
-                  input.name = 'filename';
-                  input.value = filename;
-                  
-                  form.appendChild(input);
-                  document.body.appendChild(form);
-                  form.submit();
-              } else {
-                  alert('Could not determine video filename');
-              }
+        if (
+          confirm(
+            "This will reprocess the current video file. This may take several minutes. Continue?"
+          )
+        ) {
+          // Extract filename from current URL or use a data attribute
+          const videoElement = document.querySelector("video source");
+          if (videoElement) {
+            const videoSrc = videoElement.src;
+            const filename = videoSrc.substring(videoSrc.lastIndexOf("/") + 1);
+
+            // Create a form and submit it like the working version on the main page
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = "/rerun";
+
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "filename";
+            input.value = filename;
+
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            alert("Could not determine video filename");
           }
+        }
       }
-      
+
       function goBackToList() {
-          window.location.href = '/list';
+        window.location.href = "/list";
       }
-      
+
       function editSpeakers() {
-          // Extract current speakers from the page
-          const speakerElements = document.querySelectorAll('.e span[style*="color:"]');
-          const speakers = [];
-          const seenSpeakers = new Set();
-          
-          speakerElements.forEach(el => {
-              const speakerName = el.textContent.trim();
-              if (speakerName && !seenSpeakers.has(speakerName)) {
-                  seenSpeakers.add(speakerName);
-                  speakers.push(speakerName);
-              }
-          });
-          
-          if (speakers.length === 0) {
-              alert('No speakers found in transcript');
-              return;
+        // Extract current speakers from the page
+        const speakerBlocks = document.querySelectorAll(".e[data-speaker-id]");
+        const speakers = [];
+        const seenSpeakerIds = new Set();
+
+        speakerBlocks.forEach((block) => {
+          const speakerId = block.dataset.speakerId;
+          if (!speakerId || seenSpeakerIds.has(speakerId)) {
+            return;
           }
-          
-          // Create a simple dialog for editing speaker names
-          let dialogContent = 'Edit Speaker Names:\n\n';
-          const newNames = [];
-          
-          for (let i = 0; i < speakers.length; i++) {
-              const currentName = speakers[i];
-              const newName = prompt(dialogContent + `Speaker ${i+1} (currently "${currentName}"):`);
-              
-              if (newName === null) {
-                  // User cancelled
-                  return;
-              }
-              
-              newNames.push(newName.trim() || currentName);
-              dialogContent += `Speaker ${i+1}: "${newNames[i]}"\n`;
+          seenSpeakerIds.add(speakerId);
+          const speakerName = (block.dataset.speakerName || speakerId).trim();
+          if (speakerName) {
+            speakers.push(speakerName);
           }
-          
-          // Show confirmation
-          const confirmed = confirm(
-              'Update speakers with these names?\n\n' + 
-              speakers.map((old, i) => `"${old}" → "${newNames[i]}"`).join('\n') +
-              '\n\nThis will reprocess the file with updated speaker names.'
+        });
+
+        if (speakers.length === 0) {
+          alert("No speakers found in transcript");
+          return;
+        }
+
+        // Create a simple dialog for editing speaker names
+        let dialogContent = "Edit Speaker Names:\n\n";
+        const newNames = [];
+
+        for (let i = 0; i < speakers.length; i++) {
+          const currentName = speakers[i];
+          const newName = prompt(
+            dialogContent + `Speaker ${i + 1} (currently "${currentName}"):`
           );
-          
-          if (confirmed) {
-              updateSpeakersAndReprocess(speakers, newNames);
+
+          if (newName === null) {
+            // User cancelled
+            return;
           }
+
+          newNames.push(newName.trim() || currentName);
+          dialogContent += `Speaker ${i + 1}: "${newNames[i]}"\n`;
+        }
+
+        // Show confirmation
+        const confirmed = confirm(
+          "Update speakers with these names?\n\n" +
+            speakers.map((old, i) => `"${old}" → "${newNames[i]}"`).join("\n") +
+            "\n\nThis will reprocess the file with updated speaker names."
+        );
+
+        if (confirmed) {
+          updateSpeakersAndReprocess(speakers, newNames);
+        }
       }
-      
+
       function updateSpeakersAndReprocess(oldNames, newNames) {
-          const videoElement = document.querySelector('video source');
-          if (!videoElement) {
-              alert('Could not determine video filename');
-              return;
-          }
-          
-          const videoSrc = videoElement.src;
-          const filename = videoSrc.substring(videoSrc.lastIndexOf('/') + 1);
-          const basename = filename.replace(/\.[^/.]+$/, ""); // Remove extension
-          
-          // Create speaker mapping
-          const speakerMapping = {};
-          for (let i = 0; i < oldNames.length; i++) {
-              speakerMapping[oldNames[i]] = newNames[i];
-          }
-          
-          // Send update request
-          fetch('/update-speakers', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                  filename: basename,
-                  speakers: speakerMapping
-              })
+        const videoElement = document.querySelector("video source");
+        if (!videoElement) {
+          alert("Could not determine video filename");
+          return;
+        }
+
+        const videoSrc = videoElement.src;
+        const filename = videoSrc.substring(videoSrc.lastIndexOf("/") + 1);
+        const basename = filename.replace(/\.[^/.]+$/, ""); // Remove extension
+
+        // Create speaker mapping
+        const speakerMapping = {};
+        for (let i = 0; i < oldNames.length; i++) {
+          speakerMapping[oldNames[i]] = newNames[i];
+        }
+
+        // Send update request
+        fetch("/update-speakers", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filename: basename,
+            speakers: speakerMapping,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              alert("Speaker names updated! Reprocessing file...");
+              // Now reprocess with updated speakers
+              reprocessFile();
+            } else {
+              alert(
+                "Error updating speakers: " + (data.message || "Unknown error")
+              );
+            }
           })
-          .then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  alert('Speaker names updated! Reprocessing file...');
-                  // Now reprocess with updated speakers
-                  reprocessFile();
-              } else {
-                  alert('Error updating speakers: ' + (data.message || 'Unknown error'));
-              }
-          })
-          .catch(error => {
-              console.error('Error:', error);
-              alert('Error updating speakers: ' + error.message);
+          .catch((error) => {
+            console.error("Error:", error);
+            alert("Error updating speakers: " + error.message);
           });
       }
-      
+
       // Start initialization when DOM loads
-      if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initializeVideoTracking);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeVideoTracking);
       } else {
-          initializeVideoTracking();
+        initializeVideoTracking();
       }
     </script>
   </body>
