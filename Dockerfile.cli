@@ -68,9 +68,14 @@ dst = package_root / 'branding'
 if not src.is_dir():
     print("⚠️ Branding assets not found at /app/branding; skipping copy.")
 else:
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+    try:
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+    except FileNotFoundError:
+        print("⚠️ Branding assets missing during copy; skipping.")
+    except Exception as exc:
+        print(f"⚠️ Unable to copy branding assets: {exc}")
 PY
 
 # Create a mount point for user files
