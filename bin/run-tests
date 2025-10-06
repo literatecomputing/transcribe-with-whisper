@@ -20,6 +20,31 @@ cd "$REPO_ROOT"
 echo "🧪 Running tests from: $REPO_ROOT"
 echo ""
 
+# Ensure artifacts emitted by integration tests are kept unless caller overrides
+if [ -z "${KEEP_ARTIFACTS:-}" ]; then
+    export KEEP_ARTIFACTS=1
+    echo "📦 KEEP_ARTIFACTS not set; defaulting to 1 so generated fixtures are preserved."
+fi
+
+# Ensure Hugging Face token is available for integration tests
+TRANSCRIPTION_ROOT="${TRANSCRIPTION_DIR:-$REPO_ROOT/transcription-files}"
+if [ -z "${HUGGING_FACE_AUTH_TOKEN:-}" ]; then
+    TOKEN_FILE="$TRANSCRIPTION_ROOT/.config/hf_token"
+    if [ -f "$TOKEN_FILE" ]; then
+        # Read first line, trimming whitespace/newlines without echoing token contents
+        TOKEN_VALUE=$(head -n 1 "$TOKEN_FILE" | tr -d '\r\n ')
+        if [ -n "$TOKEN_VALUE" ]; then
+            export HUGGING_FACE_AUTH_TOKEN="$TOKEN_VALUE"
+            echo "🔐 Loaded Hugging Face token from $TOKEN_FILE"
+        fi
+    fi
+fi
+
+if [ -z "${HUGGING_FACE_AUTH_TOKEN:-}" ]; then
+    echo "⚠️  HUGGING_FACE_AUTH_TOKEN not found. Integration tests that require it will be skipped." >&2
+    echo "   Provide a token via the environment or ${TRANSCRIPTION_ROOT}/.config/hf_token to exercise those paths." >&2
+fi
+
 # Check if pytest is installed
 if ! command -v pytest &> /dev/null; then
     echo "❌ pytest not found. Installing..."

@@ -332,7 +332,7 @@ def generate_html(
     speaker_section=True,
     speaker_inline=True,
     spacermilli=2000,
-    called_by_mercuryweb=True,
+    called_by_mercuryweb=False,
 ):
     # video_title is inputfile with no extension
     video_title = os.path.splitext(inputfile)[0]
@@ -1050,7 +1050,7 @@ def transcribe_video(
     whisper_device="auto",
     whisper_compute_type="auto",
     coreml_units=None,
-    called_by_mercuryweb=True,
+    called_by_mercuryweb=False,
 ):
     basename = Path(inputfile).stem
     workdir = basename
@@ -1192,7 +1192,7 @@ Examples:
         '--called-by-mercuryweb',
         dest='called_by_mercuryweb',
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help='Indicate whether the invocation originated from the Mercury web interface.'
     )
     args = parser.parse_args()

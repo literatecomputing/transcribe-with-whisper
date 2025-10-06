@@ -44,6 +44,15 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
     html_text = html.read_text(encoding="utf-8", errors="ignore")
     assert phrase in html_text, f"Phrase not found in HTML: {phrase!r}"
 
+    generator_match = re.search(r'<meta name="generator"\s+content="([^"]+)">', html_text)
+    assert generator_match, "Generator meta tag missing from CLI HTML output"
+    generator_value = generator_match.group(1)
+    family, _, version = generator_value.partition(" ")
+    assert family == "transcribe-with-whisper", (
+        "Expected CLI generator meta to originate from transcribe-with-whisper"
+    )
+    assert version.strip(), "Generator meta tag should include a version suffix"
+
     # Try DOCX conversion if helper present
     script = REPO_ROOT / 'bin' / 'html-to-docx.sh'
     if script.exists():
@@ -74,9 +83,9 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         # copy HTML
         shutil.copy2(html, artifacts_dir / html.name)
-        # copy VTT directory
-        if vtt_dir.exists():
-            shutil.copytree(vtt_dir, artifacts_dir / vtt_dir.name)
-        # copy DOCX if it exists
-        if 'docx' in locals() and docx.exists():
-            shutil.copy2(docx, artifacts_dir / docx.name)
+        # # copy VTT directory
+        # if vtt_dir.exists():
+        #     shutil.copytree(vtt_dir, artifacts_dir / vtt_dir.name)
+        # # copy DOCX if it exists
+        # if 'docx' in locals() and docx.exists():
+        #     shutil.copy2(docx, artifacts_dir / docx.name)
