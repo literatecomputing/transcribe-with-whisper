@@ -55,6 +55,22 @@ RUN if [ "$INSTALL_FROM" = "local" ]; then \
         pip install --no-cache-dir transcribe-with-whisper ; \
     fi
 
+# Ensure branding assets accompany the installed package for web UI usage
+RUN python - <<'PY'
+import pathlib
+import shutil
+import transcribe_with_whisper
+
+package_root = pathlib.Path(transcribe_with_whisper.__file__).resolve().parent.parent
+src = pathlib.Path('/app/branding')
+dst = package_root / 'branding'
+
+if src.exists():
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+PY
+
 # Create a mount point for user files
 VOLUME ["/data"]
 WORKDIR /data

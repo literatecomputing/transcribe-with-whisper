@@ -38,10 +38,8 @@ def _get_config_dir() -> Path:
 def _save_hf_token(token: str) -> None:
     """Save Hugging Face token to config file"""
     config_file = _get_config_dir() / "hf_token"
-    # Set restrictive permissions before writing
     config_file.touch(mode=0o600)
     config_file.write_text(token.strip(), encoding='utf-8')
-    # Ensure permissions are correct after writing
     config_file.chmod(0o600)
 
 def _load_hf_token() -> str | None:
@@ -71,12 +69,22 @@ def _get_hf_token() -> str | None:
 
 
 APP_DIR = Path(__file__).resolve().parent
+BRANDING_DIR = APP_DIR.parent / "branding"
+FAVICON_LINK_TAG = '<link rel="icon" type="image/svg+xml" href="/branding/mercuryscribe-logo.svg">' if BRANDING_DIR.exists() else ''
+
+
+def _inject_favicon(html: str) -> str:
+    """Insert the favicon link tag after the first </title> if available."""
+    if not FAVICON_LINK_TAG:
+        return html
+    return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
+
 # Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to repo-root ./transcription-files
 TRANSCRIPTION_DIR = Path(
-  os.getenv(
-    "TRANSCRIPTION_DIR",
-    os.getenv("UPLOAD_DIR", str(APP_DIR.parent / "transcription-files")),
-  )
+    os.getenv(
+        "TRANSCRIPTION_DIR",
+        os.getenv("UPLOAD_DIR", str(APP_DIR.parent / "transcription-files")),
+    )
 )
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -100,6 +108,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MercuryScribe (Web)", lifespan=lifespan)
 app.mount("/files", StaticFiles(directory=str(TRANSCRIPTION_DIR)), name="files")
+if BRANDING_DIR.exists():
+    app.mount("/branding", StaticFiles(directory=str(BRANDING_DIR)), name="branding")
+else:
+    print("⚠️ Branding directory not found; favicon will be unavailable.")
 
 # Simple in-memory job tracking
 jobs: Dict[str, dict] = {}
@@ -369,12 +381,12 @@ SETUP_HTML = """
 async def index(_: Request):
     if not _has_valid_token():
         return RedirectResponse(url="/setup", status_code=303)
-    return HTMLResponse(INDEX_HTML)
+    return HTMLResponse(_inject_favicon(INDEX_HTML))
 
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup_page(_: Request):
-    return HTMLResponse(SETUP_HTML)
+    return HTMLResponse(_inject_favicon(SETUP_HTML))
 
 
 @app.post("/api/save-token")
@@ -464,7 +476,7 @@ async def progress_page(job_id: str):
     else:
         duration_str = "Unknown duration"
     
-    return HTMLResponse(f"""
+    return HTMLResponse(_inject_favicon(f"""
 <!doctype html>
 <html>
   <head>
@@ -568,7 +580,7 @@ async def progress_page(job_id: str):
     </div>
   </body>
 </html>
-""")
+"""))
 
 
 def _build_cli_cmd(
@@ -1094,7 +1106,7 @@ async def list_files(_: Request):
             f"<tr><td>{name}</td><td style='text-align:right'>{size}</td><td>{mtime}</td><td>{' | '.join(actions)}</td></tr>"
         )
 
-    html = f"""
+    html = _inject_favicon(f"""
 <!doctype html>
 <html>
   <head>
@@ -1119,7 +1131,7 @@ async def list_files(_: Request):
   </table>
   </body>
 </html>
-"""
+""")
     return HTMLResponse(html)
 
 

@@ -5,6 +5,7 @@ import argparse
 import platform
 import importlib
 import base64
+import textwrap
 from functools import lru_cache
 from pathlib import Path
 import re

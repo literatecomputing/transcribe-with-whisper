@@ -50,6 +50,22 @@ COPY . /app
 # Install the project itself
 RUN pip install --no-cache-dir -e . --no-deps
 
+# Ensure branding assets ship alongside the installed package (handles editable/non-editable installs)
+RUN python - <<'PY'
+import pathlib
+import shutil
+import transcribe_with_whisper
+
+package_root = pathlib.Path(transcribe_with_whisper.__file__).resolve().parent.parent
+src = pathlib.Path('/app/branding')
+dst = package_root / 'branding'
+
+if src.exists():
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+PY
+
 # Runtime env and directories
 ENV TRANSCRIPTION_DIR=/app/transcription-files \
     PYTHONUNBUFFERED=1 \
