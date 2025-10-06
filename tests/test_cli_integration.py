@@ -84,8 +84,8 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
         # copy HTML
         shutil.copy2(html, artifacts_dir / html.name)
         # # copy VTT directory
-        # if vtt_dir.exists():
-        #     shutil.copytree(vtt_dir, artifacts_dir / vtt_dir.name)
-        # # copy DOCX if it exists
-        # if 'docx' in locals() and docx.exists():
-        #     shutil.copy2(docx, artifacts_dir / docx.name)
+        if vtt_dir.exists():
+            shutil.copytree(vtt_dir, artifacts_dir / vtt_dir.name)
+        # copy DOCX if it exists
+        if 'docx' in locals() and docx.exists():
+            shutil.copy2(docx, artifacts_dir / docx.name)
