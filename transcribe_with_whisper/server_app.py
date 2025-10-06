@@ -599,6 +599,9 @@ def _build_cli_cmd(
 ) -> List[str]:
     """Use the python -m entry to invoke CLI installed from this same package."""
     cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main"]
+
+    # Always tag server-triggered runs so the CLI can adjust behavior if needed
+    cmd.append("--called-by-mercuryweb")
     
     # Add speaker constraint flags
     if num_speakers is not None:

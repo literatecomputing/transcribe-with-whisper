@@ -332,13 +332,16 @@ def generate_html(
     speaker_section=True,
     speaker_inline=True,
     spacermilli=2000,
+    called_by_mercuryweb=True,
 ):
     # video_title is inputfile with no extension
     video_title = os.path.splitext(inputfile)[0]
     html = []
     favicon_href = _get_embedded_favicon_data_uri()
     favicon_tag = f"\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon_href}\">" if favicon_href else ""
-    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}\n    <style>
+    generator_source = "mercuryweb" if called_by_mercuryweb else "transcribe-with-whisper"
+    generator_meta_tag = f"\n    <meta name=\"generator\" content=\"{generator_source} {get_package_version()}\">"
+    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}\n    <style>
         body {{
             font-family: sans-serif;
             font-size: 18px;
@@ -1047,6 +1050,7 @@ def transcribe_video(
     whisper_device="auto",
     whisper_compute_type="auto",
     coreml_units=None,
+    called_by_mercuryweb=True,
 ):
     basename = Path(inputfile).stem
     workdir = basename
@@ -1131,6 +1135,7 @@ def transcribe_video(
         speakers,
         speaker_section=speaker_section,
         speaker_inline=speaker_inline,
+        called_by_mercuryweb=called_by_mercuryweb,
     )
     cleanup([inputWavCache, outputWav] + segment_files)
     print(f"Script completed successfully! Output: ../{basename}.html")
@@ -1183,6 +1188,13 @@ Examples:
         default=True,
         help='Include speaker label on each line (use --no-speaker-inline to hide).'
     )
+    parser.add_argument(
+        '--called-by-mercuryweb',
+        dest='called_by_mercuryweb',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='Indicate whether the invocation originated from the Mercury web interface.'
+    )
     args = parser.parse_args()
     
     # Validate speaker constraints
@@ -1214,7 +1226,8 @@ Examples:
         args.min_speakers,
         args.max_speakers,
         speaker_section=args.speaker_section,
-        speaker_inline=args.speaker_inline
+        speaker_inline=args.speaker_inline,
+        called_by_mercuryweb=args.called_by_mercuryweb,
     )    
 
 
