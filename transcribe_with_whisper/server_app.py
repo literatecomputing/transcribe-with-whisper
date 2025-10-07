@@ -31,7 +31,7 @@ except ImportError:
 # Token storage functions
 def _get_config_dir() -> Path:
     """Get the directory where config files are stored"""
-    config_dir = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "transcription-files"))) / ".config"
+    config_dir = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "mercuryscribe"))) / ".config"
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 
@@ -83,11 +83,11 @@ def _inject_favicon(html: str) -> str:
         return html
     return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
 
-# Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to repo-root ./transcription-files
+# Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to repo-root ./mercuryscribe
 TRANSCRIPTION_DIR = Path(
     os.getenv(
         "TRANSCRIPTION_DIR",
-        os.getenv("UPLOAD_DIR", str(APP_DIR.parent / "transcription-files")),
+        os.getenv("UPLOAD_DIR", str(APP_DIR.parent / "mercuryscribe")),
     )
 )
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
@@ -153,7 +153,7 @@ INDEX_HTML = """
     <div class=\"card\">
       <h1>MercuryScribe</h1>
       <p class=\"tip\">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
-      <p class=\"tip\">Manage or edit files in <code>./transcription-files</code> or use the list view: <a href=\"/list\">Browse transcription-files</a>.</p>
+      <p class=\"tip\">Manage or edit files in <code>./mercuryscribe</code> or use the list view: <a href=\"/list\">Browse mercuryscribe</a>.</p>
       <form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\" onsubmit=\"document.getElementById('submit').disabled = true; document.getElementById('submit').innerText='Processing…';\">
         <input type=\"file\" name=\"file\" accept=\"video/*,audio/*\" required>
         

@@ -22,7 +22,7 @@ Two ways to use this project:
 
   ```
   docker run --rm -p 5001:5001 \
-   -v "$(pwd)/transcription-files:/app/transcription-files" \
+   -v "$(pwd)/mercuryscribe:/app/mercuryscribe" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
   ```
 
@@ -163,7 +163,7 @@ You'll need to open a terminal and paste this in. On a Mac you can type "command
 ```bash
 docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 docker run --rm -p 5001:5001 \
-   -v "$(pwd)/transcription-files:/app/transcription-files" \
+   -v "$(pwd)/mercuryscribe:/app/mercuryscribe" \
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
@@ -176,13 +176,13 @@ If you can't figure out how to get Windows Terminal to run `bash`, this should w
 ```powershell
 docker pull ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 docker run --rm -p 5001:5001 `
-   -v "${PWD}/transcription-files:/app/transcription-files" `
+   -v "${PWD}/mercuryscribe:/app/mercuryscribe" `
    ghcr.io/literatecomputing/transcribe-with-whisper-web:latest
 ```
 
 Once that's running, go to http://localhost:5001 and you should be on your way!
 
-After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the transcription-files folder that is created in the folder/directory where you run the above command. Both HTML and DOCX files are automatically generated for each transcription.
+After that, you can open http://localhost:5001 in your web browser. The transcribed file will open in your browser and also be in the mercuryscribe folder that is created in the folder/directory where you run the above command. Both HTML and DOCX files are automatically generated for each transcription.
 
 #### Command Line Interface
 
@@ -224,7 +224,7 @@ export HUGGING_FACE_AUTH_TOKEN=hf_xxx
 Environment overrides:
 
 - `TWW_PORT` — web port (default: 5001)
-- `TWW_transcription-files_DIR` — host transcription-files directory for the web server (default: `./transcription-files`)
+- `TWW_mercuryscribe_DIR` — host mercuryscribe directory for the web server (default: `./mercuryscribe`)
 - `TWW_CLI_MOUNT_DIR` — host directory to mount at `/data` for the CLI (default: current directory)
 
 These scripts pull and run the prebuilt multi-arch images from GHCR, so you don’t need to build locally.

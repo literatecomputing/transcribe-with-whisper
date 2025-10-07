@@ -5,8 +5,8 @@ IMAGE="${TWW_WEB_IMAGE:-ghcr.io/literatecomputing/transcribe-with-whisper-web:la
 PORT="${TWW_PORT:-5001}"
 
 # if TRANSCRIPTION_DIR is set, use it
-# else use $(pwd)/transcription-files as default
-TRANSCRIPTION_DIR="${TRANSCRIPTION_DIR:-$(pwd)/transcription-files}"
+# else use $(pwd)/mercuryscribe as default
+TRANSCRIPTION_DIR="${TRANSCRIPTION_DIR:-$(pwd)/mercuryscribe}"
 
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -26,6 +26,6 @@ echo "Starting web UI on http://localhost:${PORT}"
 exec docker run --rm \
   -p "${PORT}:5001" \
   -e "HUGGING_FACE_AUTH_TOKEN=${HUGGING_FACE_AUTH_TOKEN}" \
-  -e "TRANSCRIPTION_DIR=/app/transcription-files" \
-  -v "${TRANSCRIPTION_DIR}:/app/transcription-files" \
+  -e "TRANSCRIPTION_DIR=/app/mercuryscribe" \
+  -v "${TRANSCRIPTION_DIR}:/app/mercuryscribe" \
   "${IMAGE}"
