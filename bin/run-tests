@@ -27,7 +27,7 @@ if [ -z "${KEEP_ARTIFACTS:-}" ]; then
 fi
 
 # Ensure Hugging Face token is available for integration tests
-TRANSCRIPTION_ROOT="${TRANSCRIPTION_DIR:-$REPO_ROOT/transcription-files}"
+TRANSCRIPTION_ROOT="${TRANSCRIPTION_DIR:-$REPO_ROOT/mercuryscribe}"
 if [ -z "${HUGGING_FACE_AUTH_TOKEN:-}" ]; then
     TOKEN_FILE="$TRANSCRIPTION_ROOT/.config/hf_token"
     if [ -f "$TOKEN_FILE" ]; then

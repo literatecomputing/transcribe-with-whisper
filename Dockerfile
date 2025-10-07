@@ -74,7 +74,7 @@ else:
 PY
 
 # Runtime env and directories
-ENV TRANSCRIPTION_DIR=/app/transcription-files \
+ENV TRANSCRIPTION_DIR=/app/mercuryscribe \
     PYTHONUNBUFFERED=1 \
     WEB_SERVER_MODE=1
 RUN mkdir -p ${TRANSCRIPTION_DIR}

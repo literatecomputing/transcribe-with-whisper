@@ -9,5 +9,5 @@ venv/
 *.egg-info/
 venv
 uploads/
-transcription-files/
+mercuryscribe/
 dist/
