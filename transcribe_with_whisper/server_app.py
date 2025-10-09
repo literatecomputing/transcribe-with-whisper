@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import threading
 import time
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from typing import Iterable, List, Optional, Dict
@@ -689,23 +690,21 @@ def _get_required_hf_models() -> List[Dict[str, str]]:
         return _REQUIRED_MODELS_CACHE
 
     major = _determine_pyannote_major()
-    models: List[Dict[str, str]] = []
+    models: List[Dict[str, str]] = [
+        {
+            "name": "pyannote/speaker-diarization-community-1",
+            "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
+            "description": "Speaker diarization checkpoints for pyannote.audio",
+            "probe_filename": "config.yaml",
+        }
+    ]
 
-    if major >= 4:
-        models.append(
-            {
-                "name": "pyannote/speaker-diarization-community-1",
-                "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
-                "description": "Speaker diarization checkpoints for pyannote.audio 4.x",
-                "probe_filename": "config.yaml",
-            }
-        )
-    else:
+    if major < 4:
         models.append(
             {
                 "name": "pyannote/speaker-diarization-3.1",
                 "url": "https://huggingface.co/pyannote/speaker-diarization-3.1",
-                "description": "Speaker diarization pipeline used with pyannote.audio 3.x",
+                "description": "Legacy diarization pipeline used with pyannote.audio 3.x",
                 "probe_filename": "config.yaml",
             }
         )
@@ -756,15 +755,18 @@ def _probe_model_access(model: Dict[str, str], token: str) -> Optional[str]:
     """Attempt to access a representative file in the model repo to verify gating status."""
     filename = model.get("probe_filename", "config.yaml")
     try:
-        hf_hub_download(
-            model["name"],
-            filename,
-            token=token,
-            force_download=False,
-            local_files_only=False,
-        )
+        # Download into an isolated temp directory so cached artifacts from previous tokens don't mask permission errors
+        with tempfile.TemporaryDirectory(prefix="hf_probe_") as tmpdir:
+            hf_hub_download(
+                repo_id=model["name"],
+                filename=filename,
+                token=token,
+                force_download=True,
+                cache_dir=tmpdir,
+                local_files_only=False,
+            )
         return None
-    except GatedRepoError as exc:
+    except GatedRepoError:
         return "access denied - you may need to accept the license"
     except Exception as exc:
         return f"error fetching probe file '{filename}': {exc}"
