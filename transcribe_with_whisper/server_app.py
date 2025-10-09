@@ -18,7 +18,8 @@ import webvtt
 from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub.utils import GatedRepoError
 
 # Add support for getting audio file duration
 try:
@@ -153,7 +154,7 @@ INDEX_HTML = """
     <div class=\"card\">
       <h1>MercuryScribe</h1>
       <p class=\"tip\">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
-      <p class=\"tip\">Manage or edit files in <code>./mercuryscribe</code> or use the list view: <a href=\"/list\">Browse mercuryscribe</a>.</p>
+      <p class=\"tip\">You can manage or edit files on your computer in <code>~/mercuryscribe</code> or see them here <a href=\"/list\">here</a>.</p>
       <form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\" onsubmit=\"document.getElementById('submit').disabled = true; document.getElementById('submit').innerText='Processing…';\">
         <input type=\"file\" name=\"file\" accept=\"video/*,audio/*\" required>
         
@@ -227,6 +228,8 @@ SETUP_HTML = """
       .status { margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none; }
       .button-group { display: flex; gap: 1rem; margin-top: 1.5rem; }
       .token-preview { font-family: monospace; background: #f8f9fa; padding: 0.5rem; border: 1px solid #dee2e6; border-radius: 4px; margin: 0.5rem 0; word-break: break-all; }
+            .model-list { margin: 0.75rem 0 0; padding-left: 1.5rem; }
+            .model-list li { margin: 0.35rem 0; }
     </style>
   </head>
   <body>
@@ -267,6 +270,17 @@ SETUP_HTML = """
         <strong>💡 Tip:</strong> Your token looks like <code>hf_AbCdEfGhIjKlMnOpQrStUvWxYz</code> - a mix of upper/lowercase letters after "hf_"
       </div>
     </div>
+
+            <div class="card">
+                <h2>🧠 Required AI Models</h2>
+                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below in a new tab, review the license, and click <strong>Accept</strong> to grant your token access before saving it here.</p>
+                <ul class="model-list">
+    __MODEL_LIST_ITEMS__
+                </ul>
+                <div class="tip">
+                    <strong>Why multiple models?</strong> Different platforms may install pyannote.audio 3.x or 4.x. Your token should cover the entries above so MercuryScribe can diarize speakers regardless of environment.
+                </div>
+            </div>
 
     <div class=\"card\">
       <h2>🔑 Enter Your Token</h2>
@@ -344,12 +358,20 @@ SETUP_HTML = """
           } else {
             let errorMsg = result.error || 'Failed to save token. Please check your token and try again.';
             
-            // Check if this is a model access issue
-            if (result.requires_license_acceptance || errorMsg.includes('access denied') || errorMsg.includes('license')) {
-              errorMsg += '<br><br><strong>📋 Action Required:</strong> You may need to accept the license agreements for the required AI models:<br>' +
-                         '• <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank">pyannote/speaker-diarization-community-1</a><br>' +
-                         '• <a href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank">pyannote/segmentation-3.0</a><br>' +
-                         'Visit each page, read the license, and click "Accept" if you agree.';
+                        // Check if this is a model access issue
+                                    const defaultModels = __MODEL_JSON__;
+                                    const missingModels = result.missing_models || [];
+                                    if (missingModels.length > 0 || result.requires_license_acceptance || errorMsg.toLowerCase().includes('access denied') || errorMsg.toLowerCase().includes('license')) {
+                                        const modelsToSuggest = missingModels.length ? missingModels : defaultModels;
+                                        const modelLinks = modelsToSuggest.map(model => {
+                                const reason = model.reason ? ` – ${model.reason}` : '';
+                                return `<li><a href="${model.url}" target="_blank">${model.name}</a>${reason}</li>`;
+                            }).join('');
+
+                            errorMsg += '<br><br><strong>📋 Action Required:</strong> Ensure your token has access to the following models:<ul class="model-list">' +
+                                                     modelLinks +
+                                                     '</ul>' +
+                                                     'Open each link, accept the license, then try saving your token again.';
             }
             
             showStatus(`❌ ${errorMsg}`, 'error');
@@ -393,7 +415,7 @@ async def index(_: Request):
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup_page(_: Request):
-    return HTMLResponse(_inject_favicon(SETUP_HTML))
+    return HTMLResponse(_render_setup_html())
 
 
 @app.post("/api/save-token")
@@ -409,11 +431,20 @@ async def save_token(request: Request):
         # Validate the token
         validation = _validate_hf_token(token)
         if not validation["valid"]:
-            return {"success": False, "error": validation["error"]}
+            return {
+                "success": False,
+                "error": validation.get("error"),
+                "missing_models": validation.get("missing_models", []),
+                "requires_license_acceptance": validation.get("requires_license_acceptance", False),
+            }
         
         # Save the token
         _save_hf_token(token)
-        return {"success": True, "message": "Token saved and validated successfully"}
+        return {
+            "success": True,
+            "message": "Token saved and validated successfully",
+            "missing_models": [],
+        }
         
     except Exception as e:
         return {"success": False, "error": f"Failed to save token: {str(e)}"}
@@ -438,10 +469,23 @@ async def test_token(request: Request):
         
         # Special test scenarios
         if force_no_access or token.startswith("hf_test_no_access"):
+            required_models = _get_required_hf_models()
+            error_suffix = "; ".join(
+                f"{model['name']} (access denied - you may need to accept the license)"
+                for model in required_models
+            )
             return {
                 "success": False,
-                "error": "Cannot access required models: pyannote/speaker-diarization-community-1 (access denied - you may need to accept the license); pyannote/segmentation-3.0 (access denied - you may need to accept the license)",
-                "requires_license_acceptance": True
+                "error": f"Cannot access required models: {error_suffix}",
+                "requires_license_acceptance": True,
+                "missing_models": [
+                    {
+                        "name": model["name"],
+                        "url": model["url"],
+                        "reason": "access denied - you may need to accept the license",
+                    }
+                    for model in required_models
+                ],
             }
         
         # Validate the token
@@ -450,6 +494,7 @@ async def test_token(request: Request):
             "success": validation["valid"],
             "error": validation.get("error"),
             "message": validation.get("message"),
+            "missing_models": validation.get("missing_models", []),
             "requires_license_acceptance": validation.get("requires_license_acceptance", False)
         }
         
@@ -622,19 +667,136 @@ def _build_cli_cmd(
     return cmd
 
 
+_REQUIRED_MODELS_CACHE: Optional[List[Dict[str, str]]] = None
+
+
+def _determine_pyannote_major() -> int:
+    """Return the detected pyannote.audio major version (default to 4 if unavailable)."""
+    try:
+        import pyannote.audio  # type: ignore
+
+        version = getattr(pyannote.audio, "__version__", "4.0.0")
+        major = int(str(version).split(".")[0])
+        return major if major > 0 else 4
+    except Exception:
+        return 4
+
+
+def _get_required_hf_models() -> List[Dict[str, str]]:
+    """Determine the set of Hugging Face repositories required for the current pyannote stack."""
+    global _REQUIRED_MODELS_CACHE
+    if _REQUIRED_MODELS_CACHE is not None:
+        return _REQUIRED_MODELS_CACHE
+
+    major = _determine_pyannote_major()
+    models: List[Dict[str, str]] = []
+
+    if major >= 4:
+        models.append(
+            {
+                "name": "pyannote/speaker-diarization-community-1",
+                "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
+                "description": "Speaker diarization checkpoints for pyannote.audio 4.x",
+                "probe_filename": "config.yaml",
+            }
+        )
+    else:
+        models.append(
+            {
+                "name": "pyannote/speaker-diarization-3.1",
+                "url": "https://huggingface.co/pyannote/speaker-diarization-3.1",
+                "description": "Speaker diarization pipeline used with pyannote.audio 3.x",
+                "probe_filename": "config.yaml",
+            }
+        )
+
+    models.append(
+        {
+            "name": "pyannote/segmentation-3.0",
+            "url": "https://huggingface.co/pyannote/segmentation-3.0",
+            "description": "Voice activity segmentation backbone",
+            "probe_filename": "config.yaml",
+        }
+    )
+
+    _REQUIRED_MODELS_CACHE = models
+    return models
+
+
+def _render_setup_html() -> str:
+    """Render the setup page HTML with the correct model list injected."""
+    models = _get_required_hf_models()
+
+    list_items = []
+    for model in models:
+        description = model.get("description")
+        desc_suffix = f" – {description}" if description else ""
+        list_items.append(
+            f'        <li><a href="{model["url"]}" target="_blank">{model["name"]}</a>{desc_suffix}</li>'
+        )
+
+    model_json = json.dumps(
+        [
+            {
+                "name": model["name"],
+                "url": model["url"],
+                "reason": model.get("description", "access required"),
+            }
+            for model in models
+        ]
+    )
+
+    html = SETUP_HTML
+    html = html.replace("__MODEL_LIST_ITEMS__", "\n".join(list_items))
+    html = html.replace("__MODEL_JSON__", model_json)
+    return _inject_favicon(html)
+
+
+def _probe_model_access(model: Dict[str, str], token: str) -> Optional[str]:
+    """Attempt to access a representative file in the model repo to verify gating status."""
+    filename = model.get("probe_filename", "config.yaml")
+    try:
+        hf_hub_download(
+            model["name"],
+            filename,
+            token=token,
+            force_download=False,
+            local_files_only=False,
+        )
+        return None
+    except GatedRepoError as exc:
+        return "access denied - you may need to accept the license"
+    except Exception as exc:
+        return f"error fetching probe file '{filename}': {exc}"
+
+
 def _validate_hf_token_or_die() -> None:
     token = _prime_token_env()
     if not token:
         raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
     try:
         api = HfApi()
-        api.model_info("pyannote/speaker-diarization-community-1", token=token)
-        api.model_info("pyannote/segmentation-3.0", token=token)
-        print("✅ Hugging Face token validated (speaker-diarization-community-1 and segmentation-3.0 accessible).")
+        missing_models = []
+        for model in _get_required_hf_models():
+            try:
+                api.model_info(model["name"], token=token)
+            except Exception as exc:
+                missing_models.append(f"{model['name']} (error: {exc})")
+                continue
+
+            probe_issue = _probe_model_access(model, token)
+            if probe_issue:
+                missing_models.append(f"{model['name']} ({probe_issue})")
+        if missing_models:
+            raise RuntimeError(
+                "Hugging Face token validation failed. Missing access to required models: "
+                + "; ".join(missing_models)
+            )
+        print("✅ Hugging Face token validated (all required models accessible).")
     except Exception as e:
         raise RuntimeError(
-            "Hugging Face token validation failed. Ensure the token is valid and has access to "
-            "'pyannote/speaker-diarization-community-1' and 'pyannote/segmentation-3.0'. Original error: " + str(e)
+            "Hugging Face token validation failed. Ensure the token is valid and has access to the required models. "
+            "Original error: " + str(e)
         )
 
 def _validate_hf_token(token: str) -> dict:
@@ -656,36 +818,60 @@ def _validate_hf_token(token: str) -> dict:
             return {"valid": False, "error": f"Invalid token or API access denied: {str(e)}"}
         
         # Test access to required models
-        required_models = [
-            "pyannote/speaker-diarization-community-1",
-            "pyannote/segmentation-3.0"
-        ]
-        
-        inaccessible_models = []
-        for model in required_models:
+        missing_models = []
+        requires_license_acceptance = False
+
+        for model in _get_required_hf_models():
             try:
-                api.model_info(model, token=token)
+                api.model_info(model["name"], token=token)
             except Exception as e:
                 error_msg = str(e).lower()
                 if "not found" in error_msg or "repository not found" in error_msg:
-                    inaccessible_models.append(f"{model} (repository not found)")
+                    reason = "repository not found"
                 elif "access" in error_msg or "forbidden" in error_msg or "401" in error_msg:
-                    inaccessible_models.append(f"{model} (access denied - you may need to accept the license)")
+                    reason = "access denied - you may need to accept the license"
+                    requires_license_acceptance = True
                 else:
-                    inaccessible_models.append(f"{model} (error: {str(e)})")
-        
-        if inaccessible_models:
-            error_details = "; ".join(inaccessible_models)
+                    reason = f"error: {str(e)}"
+
+                missing_models.append({
+                    "name": model["name"],
+                    "url": model["url"],
+                    "reason": reason,
+                })
+                continue
+
+            probe_issue = _probe_model_access(model, token)
+            if probe_issue:
+                if "access denied" in probe_issue:
+                    requires_license_acceptance = True
+                missing_models.append({
+                    "name": model["name"],
+                    "url": model["url"],
+                    "reason": probe_issue,
+                })
+
+        if missing_models:
+            missing_names = "; ".join(f"{model['name']} ({model['reason']})" for model in missing_models)
             return {
-                "valid": False, 
-                "error": f"Cannot access required models: {error_details}",
-                "requires_license_acceptance": any("access denied" in model for model in inaccessible_models)
+                "valid": False,
+                "error": f"Cannot access required models: {missing_names}",
+                "missing_models": missing_models,
+                "requires_license_acceptance": requires_license_acceptance,
             }
-        
-        return {"valid": True, "message": "Token validated successfully. All required models accessible."}
+
+        return {
+            "valid": True,
+            "message": "Token validated successfully. All required models accessible.",
+            "missing_models": [],
+        }
         
     except Exception as e:
-        return {"valid": False, "error": f"Unexpected validation error: {str(e)}"}
+        return {
+            "valid": False,
+            "error": f"Unexpected validation error: {str(e)}",
+            "missing_models": [],
+        }
 
 def _has_valid_token() -> bool:
     """Check if a valid token exists (graceful version that doesn't crash)"""
@@ -1103,7 +1289,7 @@ async def list_files(_: Request):
             actions.append(
                 f'<form method="post" action="/rerun" style="display:inline">'
                 f'<input type="hidden" name="filename" value="{name}">' \
-                f'<button type="submit">Re-run</button></form>'
+                f'<button type="submit">Process</button></form>'
             )
 
         # Download links (strong for DOCX)
@@ -1122,7 +1308,7 @@ async def list_files(_: Request):
   <head>
   <meta charset='utf-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
-  <title>Transcription files</title>
+  <title>Available Files</title>
   <style>
     body {{ font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }}
     table {{ width: 100%; border-collapse: collapse; }}
@@ -1131,8 +1317,8 @@ async def list_files(_: Request):
   </style>
   </head>
   <body>
-  <h1>Transcription files</h1>
-  <p><a href='/'>⬅ Upload another file</a></p>
+  <h1>Available Files</h1>
+  <p><a href='/'>⬅ Upload</a></p>
   <table>
     <thead><tr><th>File</th><th style='text-align:right'>Size</th><th>Modified</th><th>Actions</th></tr></thead>
     <tbody>
