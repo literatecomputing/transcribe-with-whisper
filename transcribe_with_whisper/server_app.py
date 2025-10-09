@@ -238,9 +238,6 @@ SETUP_HTML = """
       <h1>🚀 Welcome to MercuryScribe!</h1>
       <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
       
-      <div class=\"tip warning\">
-        <strong>Privacy Notice:</strong> Your token will be stored securely on this computer only. 
-      </div>
     </div>
 
     <div class=\"card\">
@@ -250,20 +247,20 @@ SETUP_HTML = """
           <strong>Create a HuggingFace account</strong> if you don't have one at <a href=\"https://huggingface.co/join\" target=\"_blank\">huggingface.co/join</a>
         </div>
         <div class=\"step\">
-          <strong>Get your access token</strong> by visiting <a href=\"https://huggingface.co/settings/tokens\" target=\"_blank\">HuggingFace Settings → Access Tokens</a>
+          <strong>Create an access token</strong> by visiting <a href=\"https://huggingface.co/settings/tokens\" target=\"_blank\">HuggingFace Settings → Access Tokens</a>
         </div>
         <div class=\"step\">
           <strong>Create a new token</strong> with these settings:
           <ul style=\"margin: 0.5rem 0; padding-left: 2rem;\">
             <li><strong>Name:</strong> MercuryScribe (or any name you prefer)</li>
-            <li><strong>Type:</strong> Read (Not the default: "Fine-grained")</li>
+            <li><strong>Type:</strong> Read (<strong>Not</strong> the default: "Fine-grained")</li>
           </ul>
         </div>
         <div class=\"step\">
           <strong>Copy the token</strong> - it should start with <code>hf_</code> and be about 37 characters long
         </div>
         <div class=\"step\">
-          <strong>Paste it below</strong> and click "Save Token"
+          <strong>Paste it below</strong> and click "Save Token" after requesting access to the required models below
         </div>
       </div>
 
@@ -274,7 +271,8 @@ SETUP_HTML = """
 
             <div class="card">
                 <h2>🧠 Required AI Models</h2>
-                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below in a new tab, review the license, and click <strong>Accept</strong> to grant your token access before saving it here.</p>
+                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below (it will open in a new tab), click the "Use this model" button, select "pyannote.audio", and click <strong>Agree and access repository</strong> before saving it here.</p>
+                
                 <ul class="model-list">
     __MODEL_LIST_ITEMS__
                 </ul>
@@ -713,7 +711,7 @@ def _get_required_hf_models() -> List[Dict[str, str]]:
         {
             "name": "pyannote/segmentation-3.0",
             "url": "https://huggingface.co/pyannote/segmentation-3.0",
-            "description": "Voice activity segmentation backbone",
+            "description": "Voice activity segmentation for pyannote.audio",
             "probe_filename": "config.yaml",
         }
     )
