@@ -271,8 +271,7 @@ SETUP_HTML = """
 
             <div class="card">
                 <h2>🧠 Required AI Models</h2>
-                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below (it will open in a new tab), click the "Use this model" button, select "pyannote.audio", and click <strong>Agree and access repository</strong> before saving it here.</p>
-                
+                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below (it will open in a new tab), click the <strong>Agree and access repository</strong> at the bottom of the page before clicking the save button herre.</p>
                 <ul class="model-list">
     __MODEL_LIST_ITEMS__
                 </ul>
