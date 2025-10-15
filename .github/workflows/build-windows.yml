@@ -35,8 +35,8 @@ jobs:
         run: |
           # Run the shipped PS build helper which runs PyInstaller and zips dist/
           $script = Join-Path $Env:GITHUB_WORKSPACE 'packaging\windows\build_windows.ps1'
-          # Use the call operator & to avoid pwsh -File path parsing issues seen on the runner
-          & pwsh -NoProfile -ExecutionPolicy Bypass -Command "& '$script'"
+          # Invoke the script directly in the current pwsh session using the call operator
+          & $script
 
       - name: Upload built artifact
         uses: actions/upload-artifact@v4
