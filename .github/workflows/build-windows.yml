@@ -10,6 +10,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure packaging/windows present (restore if needed)
+        shell: pwsh
+        run: |
+          Write-Output "Ensuring packaging/windows exists in the checkout..."
+          # show current top-level files
+          Write-Output "Top-level files and dirs:"
+          Get-ChildItem -Path $Env:GITHUB_WORKSPACE -Force | ForEach-Object { Write-Output $_.Name }
+
+          # Attempt to restore packaging/windows from the fetched origin/main in case sparse checkout excluded it
+          git fetch origin main --depth=1
+          if (!(Test-Path "$Env:GITHUB_WORKSPACE\packaging\windows")) {
+            Write-Output "packaging/windows missing; attempting to checkout from origin/main"
+            git checkout origin/main -- packaging/windows || git restore --source=origin/main packaging/windows -v
+          } else {
+            Write-Output "packaging/windows already present"
+          }
+
+          Write-Output "packaging directory listing:"
+          Get-ChildItem -Path "$Env:GITHUB_WORKSPACE\packaging" -Recurse -Depth 2 | ForEach-Object { Write-Output $_.FullName }
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
