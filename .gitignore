@@ -13,4 +13,7 @@ mercuryscribe/
 dist/
 \n+# packaging artifacts
 packaging/
+# allow the helper scripts needed for CI and packaging
+!packaging/windows/
+!packaging/windows/*
 *.zip
