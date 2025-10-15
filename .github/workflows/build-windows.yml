@@ -48,9 +48,18 @@ jobs:
             exit 1
           }
 
-          # Run the build helper from the repo root using a relative path to avoid quoting issues
-          Write-Output "Invoking script via relative path: .\$scriptRel"
-          .\$scriptRel
+          # Prepare to invoke the script: unblock it to avoid execution policy blocks
+          Write-Output "Unblocking: $scriptAbs"
+          Unblock-File -Path $scriptAbs -ErrorAction SilentlyContinue
+
+          # Resolve the pwsh executable path and call it with -File and the absolute script path
+          $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
+          if (-not $pwshExe) {
+            Write-Error "pwsh not found on PATH"
+            exit 1
+          }
+          Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs"
+          & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs
 
       - name: Upload built artifact
         uses: actions/upload-artifact@v4
