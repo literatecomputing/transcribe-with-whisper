@@ -11,3 +11,6 @@ venv
 uploads/
 mercuryscribe/
 dist/
+\n+# packaging artifacts
+packaging/
+*.zip
