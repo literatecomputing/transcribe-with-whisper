@@ -30,13 +30,27 @@ jobs:
           Copy-Item $f.FullName packaging\\ffmpeg\\ffmpeg.exe -Force
           Copy-Item $p.FullName packaging\\ffmpeg\\ffprobe.exe -Force
 
-      - name: Run build script
+      - name: Run build script (debug + run)
         shell: pwsh
+        working-directory: ${{ github.workspace }}
         run: |
-          # Run the shipped PS build helper which runs PyInstaller and zips dist/
-          $script = Join-Path $Env:GITHUB_WORKSPACE 'packaging\windows\build_windows.ps1'
-          # Invoke the script directly in the current pwsh session using the call operator
-          & $script
+          # Debug: ensure the script file exists and show attributes
+          $scriptRel = 'packaging\windows\build_windows.ps1'
+          $scriptAbs = Join-Path $Env:GITHUB_WORKSPACE $scriptRel
+          Write-Output "Checking script path: $scriptAbs"
+          if (Test-Path $scriptAbs) {
+            Write-Output "Script exists. Attributes:"
+            Get-Item $scriptAbs | Format-List *
+            Write-Output "First 20 lines of the script:" 
+            Get-Content $scriptAbs -TotalCount 20 | ForEach-Object { Write-Output "    $_" }
+          } else {
+            Write-Error "Script not found at $scriptAbs"
+            exit 1
+          }
+
+          # Run the build helper from the repo root using a relative path to avoid quoting issues
+          Write-Output "Invoking script via relative path: .\$scriptRel"
+          .\$scriptRel
 
       - name: Upload built artifact
         uses: actions/upload-artifact@v4
