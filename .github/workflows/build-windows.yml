@@ -1,0 +1,43 @@
+name: Build Windows bundle (manual)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Prepare packaging folder
+        shell: pwsh
+        run: |
+          # Create packaging/ffmpeg if missing and download a static ffmpeg build
+          mkdir -Force packaging\\ffmpeg
+          Write-Host "Downloading ffmpeg (essentials build)..."
+          $zip = "ffmpeg.zip"
+          Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath packaging\\ffmpeg -Force
+          # Locate ffmpeg.exe and ffprobe.exe
+          $f = Get-ChildItem -Path packaging\\ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          $p = Get-ChildItem -Path packaging\\ffmpeg -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          Copy-Item $f.FullName packaging\\ffmpeg\\ffmpeg.exe -Force
+          Copy-Item $p.FullName packaging\\ffmpeg\\ffprobe.exe -Force
+
+      - name: Run build script
+        shell: pwsh
+        run: |
+          # Run the shipped PS build helper which runs PyInstaller and zips dist/
+          .\\packaging\\windows\\build_windows.ps1
+
+      - name: Upload built artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MercuryScribe-windows-x86_64
+          path: MercuryScribe-windows-x86_64.zip
