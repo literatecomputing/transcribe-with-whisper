@@ -81,6 +81,13 @@ jobs:
           Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs"
           & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs
 
+      - name: Upload dist for manual download (even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MercuryScribe-dist
+          path: dist/MercuryScribe
+
       - name: Upload built artifact
         uses: actions/upload-artifact@v4
         with:
