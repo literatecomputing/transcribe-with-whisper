@@ -21,8 +21,12 @@ if (-not (Test-Path packaging\\ffmpeg\\ffmpeg.exe)) {
 }
 
 Write-Output "Running PyInstaller..."
-# Add hidden-imports here if PyInstaller logs complain
+# Ensure PyInstaller knows to include the local package; add the repo root to module search path
+# and be explicit about the package hidden imports so run_windows.py can import transcribe_with_whisper
 pyinstaller --noconfirm --onedir --name MercuryScribe `
+  --paths . `
+  --hidden-import transcribe_with_whisper `
+  --hidden-import transcribe_with_whisper.server_app `
   --add-data "branding;branding" `
   --add-data "packaging/ffmpeg/ffmpeg.exe;." `
   --add-data "packaging/ffmpeg/ffprobe.exe;." `

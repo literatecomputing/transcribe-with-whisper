@@ -16,6 +16,8 @@ import webbrowser
 from pathlib import Path
 
 LOG_NAME = "mercuryscribe.log"
+BUNDLE_LOG_NAME = "bundle_run.log"
+BUNDLE_FLAG_NAME = "server_started.flag"
 
 
 def _ensure_transcription_dir():
@@ -48,8 +50,21 @@ def _write_log(msg: str):
         pass
 
 
+def _write_bundle_log(msg: str):
+    # Write a log next to the exe so the build script can always find it inside the bundle
+    try:
+        exe_dir = Path(sys.executable).resolve().parent
+        log_path = exe_dir / BUNDLE_LOG_NAME
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+    except Exception:
+        # best-effort only
+        pass
+
+
 def main():
     _write_log("Starting MercuryScribe (Windows bundle)")
+    _write_bundle_log("Starting MercuryScribe (Windows bundle)")
 
     _add_bundled_ffmpeg_to_path()
 
@@ -60,24 +75,56 @@ def main():
 
         # Run the app via uvicorn programmatically
         import uvicorn
+        import traceback
 
         host = os.getenv("HOST", "127.0.0.1")
         port = int(os.getenv("PORT", "5001"))
 
-        # Open browser shortly after server starts
+        # Open browser shortly after server starts and write a startup flag file
         def on_startup():
             url = f"http://{host}:{port}/"
             try:
                 webbrowser.open(url)
                 _write_log(f"Opened browser to {url}")
+                _write_bundle_log(f"Opened browser to {url}")
             except Exception as exc:
                 _write_log(f"Failed to open browser: {exc}")
+                _write_bundle_log(f"Failed to open browser: {exc}")
+            # write a readiness flag next to the exe so build scripts can detect successful startup
+            try:
+                exe_dir = Path(sys.executable).resolve().parent
+                flag_path = exe_dir / BUNDLE_FLAG_NAME
+                with open(flag_path, "w", encoding="utf-8") as fh:
+                    fh.write("started\n")
+                _write_bundle_log(f"Wrote startup flag at {flag_path}")
+            except Exception as exc:
+                _write_bundle_log(f"Failed to write startup flag: {exc}")
 
         _write_log(f"Launching uvicorn on {host}:{port}")
-        uvicorn.run(server_app.app, host=host, port=port, lifespan="on", access_log=False)
+        _write_bundle_log(f"Launching uvicorn on {host}:{port}")
+
+        # Register the startup handler so FastAPI calls it when ready
+        try:
+            server_app.app.add_event_handler("startup", on_startup)
+        except Exception:
+            # best-effort: handler registration may not be available; on_startup will still try to write the flag
+            _write_bundle_log("Failed to register startup handler (continuing)")
+
+        # Run uvicorn and catch top-level exceptions so they get written to the bundle log
+        try:
+            uvicorn.run(server_app.app, host=host, port=port, lifespan="on", access_log=False)
+        except Exception as exc:
+            _write_bundle_log(f"Exception running uvicorn: {exc}")
+            _write_bundle_log(traceback.format_exc())
+            _write_log(f"Exception running uvicorn: {exc}")
+            raise
 
     except Exception as exc:
+        import traceback
+
         _write_log(f"Failed to start server: {exc}")
+        _write_bundle_log(f"Failed to start server: {exc}")
+        _write_bundle_log(traceback.format_exc())
         raise
 
 
