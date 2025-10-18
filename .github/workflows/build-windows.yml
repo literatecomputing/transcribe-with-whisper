@@ -1,11 +1,18 @@
 name: Build Windows bundle (manual)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      skip_smoke:
+        description: 'Set to true to skip the smoke test and always produce the dist artifact'
+        required: false
+        default: 'false'
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      SKIP_SMOKE_TEST: ${{ github.event.inputs.skip_smoke }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
