@@ -27,6 +27,9 @@ pyinstaller --noconfirm --onedir --name MercuryScribe `
   --paths . `
   --hidden-import transcribe_with_whisper `
   --hidden-import transcribe_with_whisper.server_app `
+  --hidden-import pyannote `
+  --hidden-import pyannote.audio `
+  --hidden-import pyannote.audio.telemetry `
   --add-data "branding;branding" `
   --add-data "packaging/ffmpeg/ffmpeg.exe;." `
   --add-data "packaging/ffmpeg/ffprobe.exe;." `
@@ -36,6 +39,28 @@ pyinstaller --noconfirm --onedir --name MercuryScribe `
 Copy-Item packaging/windows/start-server.bat dist\\MercuryScribe\\start-server.bat -Force
 Copy-Item packaging/windows/README_WINDOWS.txt dist\\MercuryScribe\\README_WINDOWS.txt -Force
 Write-Output "Performing smoke test of built bundle..."
+
+# Attempt to ensure any pyannote package data (including telemetry config.yaml)
+# that may not have been picked up by PyInstaller is copied into the bundle.
+# This copies any files/dirs in the virtualenv site-packages that start with
+# 'pyannote' into the dist so pyannote.audio telemetry/config.yaml is present.
+try {
+  $sitePackages = Join-Path $PWD ".venv\\Lib\\site-packages"
+  if (Test-Path $sitePackages) {
+    $pyannoteItems = Get-ChildItem -Path $sitePackages -Filter 'pyannote*' -ErrorAction SilentlyContinue
+    foreach ($item in $pyannoteItems) {
+      $dest = Join-Path (Join-Path $PWD 'dist\\MercuryScribe') $item.Name
+      Write-Output "Copying pyannote resource: $($item.FullName) -> $dest"
+      if ($item.PSIsContainer) {
+        Copy-Item -Path $item.FullName -Destination $dest -Recurse -Force
+      } else {
+        Copy-Item -Path $item.FullName -Destination $dest -Force
+      }
+    }
+  }
+} catch {
+  Write-Warning "Failed to copy pyannote site-packages into dist: $_"
+}
  
 # Allow skipping the smoke test via environment variable so CI can always produce the dist zip for manual download
 if ($env:SKIP_SMOKE_TEST -and ($env:SKIP_SMOKE_TEST -eq '1' -or $env:SKIP_SMOKE_TEST.ToLower() -eq 'true')) {
