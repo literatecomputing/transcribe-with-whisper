@@ -209,8 +209,23 @@ def format_time(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 def convert_to_wav(inputfile, outputfile):
+    import os
+    abs_input = os.path.abspath(inputfile)
+    abs_output = os.path.abspath(outputfile)
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+    log_path = os.path.join(exe_dir, "convert_to_wav.log")
+    def log(msg):
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n")
+    log(f"[convert_to_wav] cwd: {os.getcwd()}")
+    log(f"[convert_to_wav] inputfile: {inputfile}, abs: {abs_input}, exists: {os.path.isfile(inputfile)}")
+    log(f"[convert_to_wav] outputfile: {outputfile}, abs: {abs_output}, will create: {not os.path.isfile(outputfile)}")
+    # On Windows, ffmpeg should handle both / and \\ in paths, but always use abs path for safety
+    input_arg = abs_input
+    output_arg = abs_output
     if not os.path.isfile(outputfile):
-        subprocess.run(["ffmpeg", "-i", inputfile, outputfile])
+        result = subprocess.run(["ffmpeg", "-i", input_arg, output_arg])
+        log(f"[convert_to_wav] ffmpeg exited with code {result.returncode}")
 
 def create_spaced_audio(inputWav, outputWav, spacer_ms=2000):
     audio = AudioSegment.from_wav(inputWav)

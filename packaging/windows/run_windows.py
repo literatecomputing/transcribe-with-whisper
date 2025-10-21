@@ -30,14 +30,34 @@ def _ensure_transcription_dir():
 
 
 def _add_bundled_ffmpeg_to_path():
-    # If ffmpeg.exe is next to the exe, add that folder to PATH
     exe_dir = Path(sys.executable).resolve().parent
     ffmpeg = exe_dir / "ffmpeg.exe"
     ffprobe = exe_dir / "ffprobe.exe"
+    internal_dir = exe_dir / "_internal"
+    internal_ffmpeg = internal_dir / "ffmpeg.exe"
+    internal_ffprobe = internal_dir / "ffprobe.exe"
+    added = False
     if ffmpeg.exists() and ffprobe.exists():
         os.environ["PATH"] = f"{exe_dir}{os.pathsep}" + os.environ.get("PATH", "")
-        return True
-    return False
+        added = True
+    if internal_ffmpeg.exists() and internal_ffprobe.exists():
+        os.environ["PATH"] = f"{internal_dir}{os.pathsep}" + os.environ.get("PATH", "")
+        added = True
+    return added
+
+def _log_ffmpeg_path():
+    path = os.environ.get("PATH", "")
+    print(f"[MercuryScribe] PATH: {path}")
+    ffmpeg_path = None
+    for p in path.split(os.pathsep):
+        candidate = Path(p) / "ffmpeg.exe"
+        if candidate.exists():
+            ffmpeg_path = str(candidate)
+            break
+    if ffmpeg_path:
+        print(f"[MercuryScribe] ffmpeg found at: {ffmpeg_path}")
+    else:
+        print("[MercuryScribe] ffmpeg NOT found in PATH!")
 
 
 def _write_log(msg: str):
@@ -67,6 +87,7 @@ def main():
     _write_bundle_log("Starting MercuryScribe (Windows bundle)")
 
     _add_bundled_ffmpeg_to_path()
+    _log_ffmpeg_path()
 
     # Prefer using the package's entrypoint programmatically to avoid subprocess complexity
     try:
