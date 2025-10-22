@@ -46,6 +46,30 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._back
 
 
 @lru_cache(maxsize=1)
+def _find_bundled_ffmpeg() -> str | None:
+    """Find the bundled ffmpeg executable if running from a PyInstaller bundle."""
+    if not getattr(sys, 'frozen', False):
+        return None
+    
+    exe_dir = Path(sys.executable).resolve().parent
+    internal_dir = exe_dir / "_internal"
+    
+    # Check common locations for bundled ffmpeg
+    candidates = [
+        exe_dir / "ffmpeg.exe",  # Windows
+        exe_dir / "ffmpeg",      # Linux/macOS
+        internal_dir / "ffmpeg.exe",
+        internal_dir / "ffmpeg",
+    ]
+    
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+    
+    return None
+
+
+@lru_cache(maxsize=1)
 def _get_embedded_favicon_data_uri() -> str | None:
     """Return the data URI for the bundled square logo favicon."""
     logo_path = Path(__file__).resolve().parent.parent / "branding" / "transcribe-with-whisper-logo-square.svg"
@@ -224,8 +248,19 @@ def convert_to_wav(inputfile, outputfile):
     input_arg = abs_input
     output_arg = abs_output
     if not os.path.isfile(outputfile):
-        result = subprocess.run(["ffmpeg", "-i", input_arg, output_arg])
-        log(f"[convert_to_wav] ffmpeg exited with code {result.returncode}")
+        ffmpeg_cmd = _find_bundled_ffmpeg() or "ffmpeg"
+        log(f"[convert_to_wav] using ffmpeg: {ffmpeg_cmd}")
+        try:
+            result = subprocess.run([ffmpeg_cmd, "-i", input_arg, output_arg])
+            log(f"[convert_to_wav] ffmpeg exited with code {result.returncode}")
+            if result.returncode != 0:
+                log(f"[convert_to_wav] ffmpeg stderr: {result.stderr}")
+        except FileNotFoundError as e:
+            log(f"[convert_to_wav] ffmpeg command not found: {e}")
+            raise
+        except Exception as e:
+            log(f"[convert_to_wav] unexpected error: {e}")
+            raise
 
 def create_spaced_audio(inputWav, outputWav, spacer_ms=2000):
     audio = AudioSegment.from_wav(inputWav)
@@ -1177,6 +1212,12 @@ def transcribe_video(
     print(f"Script completed successfully! Output: ../{basename}.html")
 
 def main():
+    # Debug logging for CLI startup
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+    log_path = os.path.join(exe_dir, "bundle_run.log")
+    with open(log_path, "a", encoding="utf-8") as fh:
+        fh.write(f"[CLI main] Starting CLI with args: {sys.argv}\n")
+    
     parser = argparse.ArgumentParser(
         description='Transcribe video/audio with speaker diarization',
         formatter_class=argparse.RawDescriptionHelpFormatter,

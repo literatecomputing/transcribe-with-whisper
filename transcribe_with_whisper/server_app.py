@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 os.environ["WEB_SERVER_MODE"] = "1"
 import re
 import webvtt
+ 
 
 from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
@@ -91,20 +92,20 @@ def _inject_favicon(html: str) -> str:
         return html
     return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
 
-# Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to repo-root ./mercuryscribe
-# For bundled apps, prefer the user's home directory (~/mercuryscribe) so behavior matches macOS/Linux/Docker.
-if getattr(sys, 'frozen', False):
-    # In bundled app, prefer HOME/USERPROFILE to match other platforms
-    home_dir = os.getenv("HOME") or os.getenv("USERPROFILE")
-    if home_dir:
-        default_transcription_dir = Path(home_dir) / "mercuryscribe"
-    else:
-        # Fallback to legacy Windows local app data location if HOME isn't set
-        localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
-        default_transcription_dir = Path(localapp) / "MercuryScribe" if localapp else Path.cwd() / "mercuryscribe"
+# Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to HOME ~/mercuryscribe
+# Prefer the user's home directory when available (both bundled and development). Only fall back
+# to repo-relative path when HOME/USERPROFILE is not set.
+home_dir = os.getenv("HOME") or os.getenv("USERPROFILE")
+if home_dir:
+    default_transcription_dir = Path(home_dir) / "mercuryscribe"
 else:
-    # In development, use repo-relative path
-    default_transcription_dir = APP_DIR.parent / "mercuryscribe"
+    # If HOME isn't set, behave like a bundled app and try LOCALAPPDATA or APPDATA first,
+    # then finally fall back to a repo-relative path.
+    localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+    if localapp:
+        default_transcription_dir = Path(localapp) / "MercuryScribe"
+    else:
+        default_transcription_dir = APP_DIR.parent / "mercuryscribe"
 
 TRANSCRIPTION_DIR = Path(
     os.getenv(
@@ -124,11 +125,11 @@ async def lifespan(app: FastAPI):
     # Startup
     if os.getenv("SKIP_HF_STARTUP_CHECK") != "1":
         if _has_valid_token():
-            print("✅ Hugging Face token found and validated.")
+            print("Hugging Face token found and validated.")
         else:
-            print("⚠️  No valid Hugging Face token found. Users will be guided through setup.")
+            print("No valid Hugging Face token found. Users will be guided through setup.")
     else:
-        print("⚠️  Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
+        print("Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
     
     yield
     
@@ -140,7 +141,7 @@ app.mount("/files", StaticFiles(directory=str(TRANSCRIPTION_DIR)), name="files")
 if BRANDING_DIR.exists():
     app.mount("/branding", StaticFiles(directory=str(BRANDING_DIR)), name="branding")
 else:
-    print("⚠️ Branding directory not found; favicon will be unavailable.")
+    print("Branding directory not found; favicon will be unavailable.")
 
 # Simple in-memory job tracking
 jobs: Dict[str, dict] = {}
@@ -1217,53 +1218,21 @@ def _run_transcription_job(
 
         try:
             docx_out = html_out.with_suffix('.docx')
-
-            # Require python-docx + htmldocx to be installed. If they're missing the job fails.
             try:
-                from docx import Document
-                from htmldocx import HtmlToDocx
+                from transcribe_with_whisper.html_to_docx import convert_html_file_to_docx
             except Exception as import_exc:
                 jobs[job_id]["status"] = "error"
                 jobs[job_id]["message"] = (
                     "DOCX generation failed: required Python packages are missing. "
-                    "Install with: pip install python-docx htmldocx"
+                    "Install with: pip install python-docx"
                 )
-                jobs[job_id]["error"] = f"Import error for python-docx/htmldocx: {import_exc}"
+                jobs[job_id]["error"] = f"Import error for html_to_docx: {import_exc}"
                 print(f"⚠️ DOCX generation unavailable: {import_exc}")
                 return
 
             try:
-                html_content = html_out.read_text(encoding='utf-8')
-
-                # Extract only transcript-segment fragments (convert div->p and keep p.transcript-segment)
-                def _extract_transcript_fragment(h: str) -> str:
-                    # lightweight sanitization similar to bin/html-to-docx.py
-                    h = re.sub(r"<!--.*?-->", "", h, flags=re.S)
-                    h = re.sub(r"<script[^>]*>.*?</script>", "", h, flags=re.S | re.I)
-                    h = re.sub(r"<style[^>]*>.*?</style>", "", h, flags=re.S | re.I)
-                    h = re.sub(r"<a[^>]*>(.*?)</a>", r"\1", h, flags=re.S)
-                    h = re.sub(
-                        r"<div([^>]*\\bclass=[\'\"]?[^>'\"]*transcript-segment[^>'\"]*[\'\"]?[^>]*)>(.*?)</div>",
-                        r"<p\1>\2</p>",
-                        h,
-                        flags=re.S | re.I,
-                    )
-                    parts = []
-                    for m in re.findall(r"<p([^>]*\\bclass=[\'\"]?[^>]*\\btranscript-segment\\b[^>]*[\'\"]?[^>]*)>(.*?)</p>", h, flags=re.S | re.I):
-                        attrs, inner = m
-                        if inner and inner.strip():
-                            parts.append(f"<p{attrs}>{inner}</p>")
-                    return "\n".join(parts)
-
-                fragment = _extract_transcript_fragment(html_content)
-                if not fragment.strip():
-                    fragment = html_content
-
-                document = Document()
-                converter = HtmlToDocx()
-                converter.add_html_to_document(fragment, document)
-                document.save(str(docx_out))
-                print(f"✅ Generated DOCX (python): {docx_out.name}")
+                convert_html_file_to_docx(html_out, docx_out)
+                print(f"✅ Generated DOCX (shared): {docx_out.name}")
             except Exception as py_exc:
                 jobs[job_id]["status"] = "error"
                 jobs[job_id]["message"] = "DOCX generation failed during conversion"
