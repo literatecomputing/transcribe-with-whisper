@@ -33,7 +33,13 @@ except ImportError:
 # Token storage functions
 def _get_config_dir() -> Path:
     """Get the directory where config files are stored"""
-    config_dir = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "mercuryscribe"))) / ".config"
+    # Use the already-resolved TRANSCRIPTION_DIR so saved config lives where the server reads it
+    try:
+        config_base = TRANSCRIPTION_DIR
+    except NameError:
+        # Fallback only during early import when TRANSCRIPTION_DIR hasn't been set yet
+        config_base = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "mercuryscribe")))
+    config_dir = Path(config_base) / ".config"
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 
@@ -86,10 +92,24 @@ def _inject_favicon(html: str) -> str:
     return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
 
 # Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to repo-root ./mercuryscribe
+# For bundled apps, prefer the user's home directory (~/mercuryscribe) so behavior matches macOS/Linux/Docker.
+if getattr(sys, 'frozen', False):
+    # In bundled app, prefer HOME/USERPROFILE to match other platforms
+    home_dir = os.getenv("HOME") or os.getenv("USERPROFILE")
+    if home_dir:
+        default_transcription_dir = Path(home_dir) / "mercuryscribe"
+    else:
+        # Fallback to legacy Windows local app data location if HOME isn't set
+        localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+        default_transcription_dir = Path(localapp) / "MercuryScribe" if localapp else Path.cwd() / "mercuryscribe"
+else:
+    # In development, use repo-relative path
+    default_transcription_dir = APP_DIR.parent / "mercuryscribe"
+
 TRANSCRIPTION_DIR = Path(
     os.getenv(
         "TRANSCRIPTION_DIR",
-        os.getenv("UPLOAD_DIR", str(APP_DIR.parent / "mercuryscribe")),
+        os.getenv("UPLOAD_DIR", str(default_transcription_dir)),
     )
 )
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
@@ -641,10 +661,16 @@ def _build_cli_cmd(
     max_speakers: Optional[int] = None
 ) -> List[str]:
     """Use the python -m entry to invoke CLI installed from this same package."""
-    cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main"]
-
-    # Always tag server-triggered runs so the CLI can adjust behavior if needed
-    cmd.append("--called-by-mercuryweb")
+    # When running unpacked/dev, invoke via the Python interpreter module form.
+    # When running as a frozen bundle, sys.executable is the bundled exe: use the bundle's --run-cli entry instead.
+    if getattr(sys, 'frozen', False):
+        # The bundle supports: MercuryScribe.exe --run-cli <args...>
+        cmd: List[str] = [sys.executable, "--run-cli"]
+        # Tag the invocation so the CLI can adjust behavior
+        cmd.append("--called-by-mercuryweb")
+        # Add speaker constraint flags after the portal flag below
+    else:
+        cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main", "--called-by-mercuryweb"]
     
     # Add speaker constraint flags
     if num_speakers is not None:
@@ -655,7 +681,7 @@ def _build_cli_cmd(
         if max_speakers is not None:
             cmd.extend(["--max-speakers", str(max_speakers)])
     
-    # Add filename
+    # Add filename (always after flags)
     cmd.append(filename)
     
     # Add speaker names
@@ -1115,6 +1141,12 @@ def _run_transcription_job(
 
         cmd = _build_cli_cmd(filename, speakers or None, num_speakers, min_speakers, max_speakers)
         
+        # Debug logging
+        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+        log_path = os.path.join(exe_dir, "bundle_run.log")
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(f"[_run_transcription_job] job_id: {job_id}, filename: {filename}, cmd: {cmd}\n")
+        
         # Use Popen for real-time output monitoring
         import subprocess
         import threading
@@ -1124,6 +1156,13 @@ def _run_transcription_job(
         token = _prime_token_env()
         if token:
             env["HUGGING_FACE_AUTH_TOKEN"] = token
+        
+        # Ensure bundled ffmpeg is in PATH for subprocess
+        if getattr(sys, 'frozen', False):
+            exe_dir = Path(sys.executable).resolve().parent
+            internal_dir = exe_dir / "_internal"
+            current_path = env.get("PATH", "")
+            env["PATH"] = f"{exe_dir}{os.pathsep}{internal_dir}{os.pathsep}{current_path}"
         
         proc = subprocess.Popen(
             cmd,
@@ -1178,13 +1217,58 @@ def _run_transcription_job(
 
         try:
             docx_out = html_out.with_suffix('.docx')
-            # Try to find helper script in working directory's bin first, then skip silently
-            html_to_docx_script = Path("bin/html-to-docx.sh")
-            if html_to_docx_script.exists():
-                subprocess.run([str(html_to_docx_script), str(html_out), str(docx_out)], check=True, capture_output=True, text=True)
-                print(f"✅ Generated DOCX: {docx_out.name}")
-            else:
-                print("⚠️ html-to-docx.sh not found in ./bin, skipping DOCX generation")
+
+            # Require python-docx + htmldocx to be installed. If they're missing the job fails.
+            try:
+                from docx import Document
+                from htmldocx import HtmlToDocx
+            except Exception as import_exc:
+                jobs[job_id]["status"] = "error"
+                jobs[job_id]["message"] = (
+                    "DOCX generation failed: required Python packages are missing. "
+                    "Install with: pip install python-docx htmldocx"
+                )
+                jobs[job_id]["error"] = f"Import error for python-docx/htmldocx: {import_exc}"
+                print(f"⚠️ DOCX generation unavailable: {import_exc}")
+                return
+
+            try:
+                html_content = html_out.read_text(encoding='utf-8')
+
+                # Extract only transcript-segment fragments (convert div->p and keep p.transcript-segment)
+                def _extract_transcript_fragment(h: str) -> str:
+                    # lightweight sanitization similar to bin/html-to-docx.py
+                    h = re.sub(r"<!--.*?-->", "", h, flags=re.S)
+                    h = re.sub(r"<script[^>]*>.*?</script>", "", h, flags=re.S | re.I)
+                    h = re.sub(r"<style[^>]*>.*?</style>", "", h, flags=re.S | re.I)
+                    h = re.sub(r"<a[^>]*>(.*?)</a>", r"\1", h, flags=re.S)
+                    h = re.sub(
+                        r"<div([^>]*\\bclass=[\'\"]?[^>'\"]*transcript-segment[^>'\"]*[\'\"]?[^>]*)>(.*?)</div>",
+                        r"<p\1>\2</p>",
+                        h,
+                        flags=re.S | re.I,
+                    )
+                    parts = []
+                    for m in re.findall(r"<p([^>]*\\bclass=[\'\"]?[^>]*\\btranscript-segment\\b[^>]*[\'\"]?[^>]*)>(.*?)</p>", h, flags=re.S | re.I):
+                        attrs, inner = m
+                        if inner and inner.strip():
+                            parts.append(f"<p{attrs}>{inner}</p>")
+                    return "\n".join(parts)
+
+                fragment = _extract_transcript_fragment(html_content)
+                if not fragment.strip():
+                    fragment = html_content
+
+                document = Document()
+                converter = HtmlToDocx()
+                converter.add_html_to_document(fragment, document)
+                document.save(str(docx_out))
+                print(f"✅ Generated DOCX (python): {docx_out.name}")
+            except Exception as py_exc:
+                jobs[job_id]["status"] = "error"
+                jobs[job_id]["message"] = "DOCX generation failed during conversion"
+                jobs[job_id]["error"] = f"Conversion error: {py_exc}"
+                print(f"⚠️ DOCX conversion failed: {py_exc}")
         except Exception as e:
             print(f"⚠️ DOCX generation failed: {e}")
 

@@ -2,3 +2,7 @@ pytest
 pytest-cov
 requests
 httpx
+
+# Needed for HTML -> DOCX conversion during development/tests
+python-docx>=0.8.12
+htmldocx>=0.0.14
