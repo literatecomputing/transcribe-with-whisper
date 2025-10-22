@@ -4,16 +4,30 @@ __pycache__/
 .env
 .venv/
 venv/
-/*.egg-info/
-*.log
+.venv-*
+.venv-ci/
 *.egg-info/
-venv
+*.log
 uploads/
 mercuryscribe/
+build/
 dist/
-\n+# packaging artifacts
+
+# packaging artifacts
 packaging/
 # allow the helper scripts needed for CI and packaging
 !packaging/windows/
 !packaging/windows/*
 *.zip
+
+# PyInstaller and Python caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.cache/
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+desktop.ini
