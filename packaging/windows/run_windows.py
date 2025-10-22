@@ -10,10 +10,10 @@ This script is intended to be bundled with PyInstaller (onedir).
 from __future__ import annotations
 
 import os
-import sys
 import time
 import webbrowser
 from pathlib import Path
+import sys
 
 LOG_NAME = "mercuryscribe.log"
 BUNDLE_LOG_NAME = "bundle_run.log"
@@ -21,9 +21,14 @@ BUNDLE_FLAG_NAME = "server_started.flag"
 
 
 def _ensure_transcription_dir():
-    # Use %LOCALAPPDATA% on Windows if available
-    localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
-    default = Path(localapp) / "MercuryScribe" if localapp else Path.cwd() / "mercuryscribe"
+    # Prefer the user's home directory (USERPROFILE/HOME) on Windows to match macOS/Linux/Docker behavior
+    home = os.getenv("USERPROFILE") or os.getenv("HOME")
+    if home:
+        default = Path(home) / "mercuryscribe"
+    else:
+        # Fallback to LOCALAPPDATA\MercuryScribe if a home directory isn't available
+        localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+        default = Path(localapp) / "MercuryScribe" if localapp else Path.cwd() / "mercuryscribe"
     td = Path(os.getenv("TRANSCRIPTION_DIR", str(default)))
     td.mkdir(parents=True, exist_ok=True)
     return td
@@ -60,6 +65,41 @@ def _log_ffmpeg_path():
         print("[MercuryScribe] ffmpeg NOT found in PATH!")
 
 
+def _insert_pyannote_telemetry_stub():
+    """Insert a defensive no-op telemetry stub for pyannote before importing the package.
+
+    This must run early (including CLI mode) to avoid import-time IO inside frozen bundles.
+    """
+    try:
+        import types
+        import sys as _sys
+        telemetry_mod_name = "pyannote.audio.telemetry"
+        telemetry_metrics_name = "pyannote.audio.telemetry.metrics"
+        if telemetry_mod_name not in _sys.modules:
+            stub = types.ModuleType(telemetry_mod_name)
+            def set_telemetry_metrics(enabled, save_choice_as_default=False):
+                return None
+            def set_opentelemetry_log_level(level):
+                return None
+            def track_model_init(*args, **kwargs):
+                return None
+            def track_pipeline_init(*args, **kwargs):
+                return None
+            def track_pipeline_apply(*args, **kwargs):
+                return None
+            stub.set_telemetry_metrics = set_telemetry_metrics
+            stub.set_opentelemetry_log_level = set_opentelemetry_log_level
+            stub.track_model_init = track_model_init
+            stub.track_pipeline_init = track_pipeline_init
+            stub.track_pipeline_apply = track_pipeline_apply
+            _sys.modules[telemetry_mod_name] = stub
+            _sys.modules[telemetry_metrics_name] = stub
+            _write_bundle_log("Inserted pyannote.telemetry stub into sys.modules (early)")
+    except Exception:
+        # best-effort only
+        pass
+
+
 def _write_log(msg: str):
     td = _ensure_transcription_dir()
     log_path = td / LOG_NAME
@@ -85,12 +125,77 @@ def _write_bundle_log(msg: str):
 def main():
     _write_log("Starting MercuryScribe (Windows bundle)")
     _write_bundle_log("Starting MercuryScribe (Windows bundle)")
-
+    # Ensure ffmpeg path is available to any subprocesses and log what we find
     _add_bundled_ffmpeg_to_path()
     _log_ffmpeg_path()
 
+    # Disable pyannote telemetry explicitly via environment variable as recommended
+    # by pyannote docs. Setting the environment variable prevents the telemetry
+    # module from performing import-time config IO inside frozen bundles.
+    try:
+        os.environ.setdefault("PYANNOTE_METRICS_ENABLED", "0")
+        _write_bundle_log("Set PYANNOTE_METRICS_ENABLED=0 to disable pyannote telemetry")
+    except Exception:
+        # best-effort only
+        pass
+
+    # Insert telemetry stub early so CLI-mode imports below cannot trigger file IO
+    _insert_pyannote_telemetry_stub()
+
+    # Support a simple CLI mode when invoked as: MercuryScribe.exe --run-cli <args...>
+    # This allows the web server to spawn the bundled exe to perform CLI work
+    if "--run-cli" in sys.argv:
+        try:
+            idx = sys.argv.index("--run-cli")
+            cli_args = sys.argv[idx+1:]
+            # Make sys.argv look like a normal CLI invocation for the bundled module
+            sys.argv = [sys.executable] + cli_args
+            _write_bundle_log(f"Entering CLI mode with args: {cli_args}")
+            import transcribe_with_whisper.main as cli_mod
+            cli_mod.main()
+            return
+        except Exception as exc:
+            import traceback
+            _write_bundle_log(f"Exception in CLI mode: {exc}")
+            _write_bundle_log(traceback.format_exc())
+            raise
+
     # Prefer using the package's entrypoint programmatically to avoid subprocess complexity
     try:
+        # Insert a safe no-op telemetry stub so importing pyannote subpackages
+        # cannot trigger import-time IO inside a frozen bundle. We set the
+        # environment variable first (upstream-recommended), then register a
+        # stub module for both 'pyannote.audio.telemetry' and
+        # 'pyannote.audio.telemetry.metrics'. This is intentionally defensive
+        # and avoids importing the real telemetry module inside the bundle.
+        try:
+            import types
+            telemetry_mod_name = "pyannote.audio.telemetry"
+            telemetry_metrics_name = "pyannote.audio.telemetry.metrics"
+            if telemetry_mod_name not in sys.modules:
+                stub = types.ModuleType(telemetry_mod_name)
+                def set_telemetry_metrics(enabled, save_choice_as_default=False):
+                    return None
+                def set_opentelemetry_log_level(level):
+                    return None
+                def track_model_init(*args, **kwargs):
+                    return None
+                def track_pipeline_init(*args, **kwargs):
+                    return None
+                def track_pipeline_apply(*args, **kwargs):
+                    return None
+                stub.set_telemetry_metrics = set_telemetry_metrics
+                stub.set_opentelemetry_log_level = set_opentelemetry_log_level
+                stub.track_model_init = track_model_init
+                stub.track_pipeline_init = track_pipeline_init
+                stub.track_pipeline_apply = track_pipeline_apply
+                sys.modules[telemetry_mod_name] = stub
+                sys.modules[telemetry_metrics_name] = stub
+                _write_bundle_log("Inserted pyannote.telemetry stub into sys.modules")
+        except Exception:
+            # Best-effort only
+            pass
+
         # Ensure the package is importable
         import transcribe_with_whisper.server_app as server_app
 
