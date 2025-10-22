@@ -1,6 +1,12 @@
-name: Build Windows bundle (manual)
+name: Build Windows bundle (build on tags / PR / manual)
 
 on:
+  push:
+    # Build on versioned releases (tags like v1.2.3)
+    tags: ["v*"]
+  pull_request:
+    # Run for PRs so the bundle is validated during reviews
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       skip_smoke:
