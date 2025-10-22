@@ -53,11 +53,16 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
     )
     assert version.strip(), "Generator meta tag should include a version suffix"
 
-    # Try DOCX conversion if helper present
-    script = REPO_ROOT / 'bin' / 'html-to-docx.sh'
-    if script.exists():
+    # Try DOCX conversion if helper present. Prefer the Python helper on Windows
+    script_py = REPO_ROOT / 'bin' / 'html-to-docx.py'
+    script_sh = REPO_ROOT / 'bin' / 'html-to-docx.sh'
+    if script_py.exists() or script_sh.exists():
         docx = work / f"{basename}.docx"
-        proc2 = subprocess.run([str(script), str(html), str(docx)], capture_output=True, text=True)
+        if script_py.exists():
+            # Run the Python helper with the current interpreter to ensure cross-platform behavior
+            proc2 = subprocess.run([sys.executable, str(script_py), str(html), str(docx)], capture_output=True, text=True)
+        else:
+            proc2 = subprocess.run([str(script_sh), str(html), str(docx)], capture_output=True, text=True)
         assert proc2.returncode == 0, f"DOCX conversion failed: {proc2.stderr}"
         assert docx.exists(), "DOCX not created"
         # Verify phrase within DOCX contents (read document.xml from zip)
