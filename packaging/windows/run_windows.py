@@ -16,20 +16,46 @@ from pathlib import Path
 import sys
 import io
 import importlib
+import traceback
+import os as _os
 
 # Configure text IO to UTF-8 as early as possible at module import time.
-# This helps prevent UnicodeEncodeError raised by emoji printed during
-# preflight checks when a Windows console uses a legacy code page.
+# Prefer setting PYTHONIOENCODING and avoid rewrapping sys.stdout/stderr here,
+# because wrapping can fail in frozen/executed-with-redirection scenarios
+# (it may attempt to wrap a closed underlying buffer). The environment var
+# is sufficient in most cases to ensure UTF-8 encoding for subprocesses and
+# Python text IO.
 try:
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-    # Wrap stdout/stderr if they expose a binary buffer
-    if hasattr(sys, "stdout") and getattr(sys.stdout, "buffer", None) is not None:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
-    if hasattr(sys, "stderr") and getattr(sys.stderr, "buffer", None) is not None:
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
 except Exception:
-    # Best-effort only; don't fail import if wrapping isn't possible in this environment
     pass
+
+# Defensive: if sys.stdout/stderr are closed (can happen in frozen apps
+# run under certain launchers or when output was redirected and closed),
+# replace them with devnull file objects so future prints won't raise.
+try:
+    if getattr(sys.stderr, "closed", False):
+        sys.stderr = open(_os.devnull, "w", encoding="utf-8", errors="replace")
+    if getattr(sys.stdout, "closed", False):
+        sys.stdout = open(_os.devnull, "w", encoding="utf-8", errors="replace")
+except Exception:
+    # best-effort
+    pass
+
+# Early exception handler that writes tracebacks to a bundle-local file so
+# we can diagnose import-time errors without depending on sys.stderr.
+def _early_excepthook(exc_type, exc_value, exc_tb):
+    try:
+        exe_dir = Path(sys.executable).resolve().parent
+        log_path = exe_dir / BUNDLE_LOG_NAME
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write("[EARLY-EXCEPTION] \n")
+            fh.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+    except Exception:
+        # If even this fails, there's nothing else we can do here
+        pass
+
+sys.excepthook = _early_excepthook
 
 # Prefer packages placed next to the exe (onedir) over frozen archive modules.
 # This makes it possible to copy a package directory (e.g. pyannote/) into the
@@ -160,13 +186,10 @@ def main():
     try:
         # If PYTHONIOENCODING isn't already set, prefer utf-8 for all text IO.
         os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-        # Replace stdout/stderr with wrappers using utf-8 encoding so prints
-        # from frozen code (or libraries) won't raise UnicodeEncodeError.
-        if hasattr(sys, "stdout") and sys.stdout is not None:
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
-        if hasattr(sys, "stderr") and sys.stderr is not None:
-            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
-        _write_bundle_log("Configured stdio to utf-8 to avoid encoding errors")
+        # Setting PYTHONIOENCODING is typically sufficient. Avoid rewrapping
+        # sys.stdout/sys.stderr here because it can lead to 'I/O operation on
+        # closed file' when the process is invoked with redirected output.
+        _write_bundle_log("Set PYTHONIOENCODING=utf-8 (no rewrap) to avoid encoding errors")
     except Exception:
         # Best-effort: if wrapping fails (rare under frozen exe), continue.
         pass
