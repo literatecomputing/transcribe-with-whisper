@@ -60,7 +60,11 @@ def _load_hf_token() -> str | None:
     if config_file.exists():
         try:
             token = config_file.read_text(encoding='utf-8').strip()
-            return token if token else None
+            if token:
+                # Ensure any code relying on the environment sees the token as well
+                os.environ["HUGGING_FACE_AUTH_TOKEN"] = token
+                return token
+            return None
         except (OSError, UnicodeDecodeError):
             return None
     return None
