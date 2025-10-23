@@ -14,6 +14,37 @@ import time
 import webbrowser
 from pathlib import Path
 import sys
+import io
+import importlib
+
+# Configure text IO to UTF-8 as early as possible at module import time.
+# This helps prevent UnicodeEncodeError raised by emoji printed during
+# preflight checks when a Windows console uses a legacy code page.
+try:
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    # Wrap stdout/stderr if they expose a binary buffer
+    if hasattr(sys, "stdout") and getattr(sys.stdout, "buffer", None) is not None:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    if hasattr(sys, "stderr") and getattr(sys.stderr, "buffer", None) is not None:
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+except Exception:
+    # Best-effort only; don't fail import if wrapping isn't possible in this environment
+    pass
+
+# Prefer packages placed next to the exe (onedir) over frozen archive modules.
+# This makes it possible to copy a package directory (e.g. pyannote/) into the
+# onedir next to the executable and have the frozen app import it as a normal
+# filesystem package.
+try:
+    exe_dir = Path(sys.executable).resolve().parent
+    exe_dir_str = str(exe_dir)
+    if exe_dir_str and exe_dir_str not in sys.path:
+        sys.path.insert(0, exe_dir_str)
+        # Avoid calling runtime helper functions here (they are defined later).
+        # We'll rely on the main() function to write bundle logs after helpers exist.
+except Exception:
+    # best-effort only
+    pass
 
 LOG_NAME = "mercuryscribe.log"
 BUNDLE_LOG_NAME = "bundle_run.log"
@@ -123,6 +154,23 @@ def _write_bundle_log(msg: str):
 
 
 def main():
+    # Ensure stdout/stderr are UTF-8 to avoid UnicodeEncodeError when the
+    # application prints emoji or other non-encodable characters on Windows
+    # consoles that default to a legacy code page.
+    try:
+        # If PYTHONIOENCODING isn't already set, prefer utf-8 for all text IO.
+        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+        # Replace stdout/stderr with wrappers using utf-8 encoding so prints
+        # from frozen code (or libraries) won't raise UnicodeEncodeError.
+        if hasattr(sys, "stdout") and sys.stdout is not None:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+        if hasattr(sys, "stderr") and sys.stderr is not None:
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+        _write_bundle_log("Configured stdio to utf-8 to avoid encoding errors")
+    except Exception:
+        # Best-effort: if wrapping fails (rare under frozen exe), continue.
+        pass
+
     _write_log("Starting MercuryScribe (Windows bundle)")
     _write_bundle_log("Starting MercuryScribe (Windows bundle)")
     # Ensure ffmpeg path is available to any subprocesses and log what we find

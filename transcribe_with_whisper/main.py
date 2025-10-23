@@ -1129,7 +1129,13 @@ def transcribe_video(
 
     # Prepare audio
     inputWavCache = f"{basename}.cache.wav"
-    convert_to_wav(f"../{inputfile}", inputWavCache)
+    # If the caller provided an absolute path, don't prefix with "../" (that corrupts absolute paths
+    # when the code changes into the workdir). Use the absolute or original path accordingly.
+    if os.path.isabs(str(inputfile)):
+        input_arg = str(inputfile)
+    else:
+        input_arg = f"../{inputfile}"
+    convert_to_wav(input_arg, inputWavCache)
     outputWav = f"{basename}-spaced.wav"
     create_spaced_audio(inputWavCache, outputWav)
 

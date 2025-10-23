@@ -3,10 +3,15 @@
 
 a_from_pyannote = None
 try:
-    from PyInstaller.utils.hooks import collect_submodules
+    from PyInstaller.utils.hooks import collect_submodules, collect_data_files
     pyannote_subs = collect_submodules('pyannote.audio')
+    # Collect package data files for pyannote so the onedir build contains the
+    # package files (models, subpackages, data) that imports expect at runtime.
+    pyannote_datas = collect_data_files('pyannote')
 except Exception:
+    # Fallback conservative defaults when PyInstaller helpers aren't available
     pyannote_subs = ['pyannote.audio', 'pyannote.audio.models']
+    pyannote_datas = []
 
 hidden_imports = [
     'transcribe_with_whisper',
@@ -20,13 +25,14 @@ a = Analysis(
     ['packaging\\windows\\run_windows.py'],
     pathex=['.'],
     binaries=[],
+    # Start with static datas then extend with any pyannote package files
     datas=[
         ('branding', 'branding'),
         ('packaging/ffmpeg/ffmpeg.exe', '.'),
         ('packaging/ffmpeg/ffprobe.exe', '.'),
         # Include pyannote telemetry config so runtime can find it inside the bundle
         ('.venv/Lib/site-packages/pyannote/audio/telemetry/config.yaml', '_internal/pyannote/audio/telemetry'),
-    ],
+    ] + pyannote_datas,
     hiddenimports=hidden_imports,
     hookspath=['hooks'],
     hooksconfig={},
