@@ -14,11 +14,14 @@ mercuryscribe/
 build/
 dist/
 
-# packaging artifacts
-packaging/
-# allow the helper scripts needed for CI and packaging
+# packaging artifacts - ignore only caches, not the entire packaging tree
+packaging/__pycache__/
+packaging/*/__pycache__/
+# allow packaging contents (scripts, resources) to be tracked
 !packaging/windows/
 !packaging/windows/*
+!packaging/windows/build_windows.ps1
+!packaging/windows/build-windows.ps1
 *.zip
 
 # PyInstaller and Python caches
