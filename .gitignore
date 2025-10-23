@@ -17,6 +17,7 @@ dist/
 # packaging artifacts - ignore only caches, not the entire packaging tree
 packaging/__pycache__/
 packaging/*/__pycache__/
+packaging/ffmpeg
 # allow packaging contents (scripts, resources) to be tracked
 !packaging/windows/
 !packaging/windows/*
