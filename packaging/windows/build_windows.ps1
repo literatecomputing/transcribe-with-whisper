@@ -25,11 +25,13 @@ Write-Output "Running PyInstaller..."
 # and be explicit about the package hidden imports so run_windows.py can import transcribe_with_whisper
 pyinstaller --noconfirm --onedir --name MercuryScribe `
   --paths . `
+  --additional-hooks-dir hooks `
   --hidden-import transcribe_with_whisper `
   --hidden-import transcribe_with_whisper.server_app `
   --hidden-import pyannote `
   --hidden-import pyannote.audio `
   --hidden-import pyannote.audio.telemetry `
+  --hidden-import asteroid_filterbanks `
   --add-data "branding;branding" `
   --add-data "packaging/ffmpeg/ffmpeg.exe;." `
   --add-data "packaging/ffmpeg/ffprobe.exe;." `
@@ -47,6 +49,21 @@ Write-Output "Performing smoke test of built bundle..."
 try {
   $sitePackages = Join-Path $PWD ".venv\\Lib\\site-packages"
   if (Test-Path $sitePackages) {
+    # Also copy asteroid_filterbanks if present in site-packages as a fallback
+    try {
+      $af = Get-ChildItem -Path $sitePackages -Filter 'asteroid_filterbanks*' -ErrorAction SilentlyContinue
+      foreach ($item in $af) {
+        $dest = Join-Path (Join-Path $PWD 'dist\MercuryScribe') $item.Name
+        Write-Output "Copying asteroid_filterbanks resource: $($item.FullName) -> $dest"
+        if ($item.PSIsContainer) {
+          Copy-Item -Path $item.FullName -Destination $dest -Recurse -Force
+        } else {
+          Copy-Item -Path $item.FullName -Destination $dest -Force
+        }
+      }
+    } catch {
+      Write-Warning "Failed to copy asteroid_filterbanks from site-packages: $_"
+    }
     $pyannoteItems = Get-ChildItem -Path $sitePackages -Filter 'pyannote*' -ErrorAction SilentlyContinue
     foreach ($item in $pyannoteItems) {
       $dest = Join-Path (Join-Path $PWD 'dist\\MercuryScribe') $item.Name
