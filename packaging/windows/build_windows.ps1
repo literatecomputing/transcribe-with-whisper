@@ -196,9 +196,14 @@ if (-not $ok) {
 Write-Output "Server responded; verifying bundled ffmpeg..."
 
 # Run bundled ffmpeg -version
-$ffmpegPath = Join-Path -Path (Join-Path $PWD 'dist\\MercuryScribe') -ChildPath 'ffmpeg.exe'
+# Look for ffmpeg at the bundle root first, then in the _internal directory (PyInstaller sometimes places data there)
+$distRoot = Join-Path $PWD 'dist\MercuryScribe'
+$ffmpegPath = Join-Path -Path $distRoot -ChildPath 'ffmpeg.exe'
 if (-not (Test-Path $ffmpegPath)) {
-  Write-Error "ffmpeg.exe not found in bundle at $ffmpegPath"
+  $ffmpegPath = Join-Path -Path $distRoot -ChildPath '_internal\ffmpeg.exe'
+}
+if (-not (Test-Path $ffmpegPath)) {
+  Write-Error "ffmpeg.exe not found in bundle at expected locations: $distRoot\ffmpeg.exe or $distRoot\_internal\ffmpeg.exe"
   try { if ($proc -and -not $proc.HasExited) { $proc | Stop-Process -Force } } catch {}
   exit 1
 }
