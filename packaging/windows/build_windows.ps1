@@ -11,7 +11,7 @@ Write-Output "Setting up virtualenv..."
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+pip install -r requirements-windows.txt
 pip install pyinstaller
 
 # Ensure packaging/ffmpeg contains ffmpeg.exe and ffprobe.exe (place them there manually or download prior to running)
