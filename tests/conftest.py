@@ -1,12 +1,11 @@
 import os
-import sys
 import shutil
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from types import SimpleNamespace
 from fastapi.testclient import TestClient
-
 
 ARTIFACTS_BASE = Path(__file__).resolve().parent.parent / "artifacts" / "test-audio"
 ART_BASENAME = "test-audio"

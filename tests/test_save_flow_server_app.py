@@ -1,7 +1,5 @@
-from pathlib import Path
 
 import webvtt
-import pytest
 
 
 def test_save_edits_updates_vtts_using_artifacts(app_with_artifacts):

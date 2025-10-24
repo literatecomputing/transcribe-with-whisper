@@ -1,122 +1,127 @@
+import json
 import os
-import sys
 import shutil
 import subprocess
+import sys
+import tempfile
 import threading
 import time
-import tempfile
-from pathlib import Path
-from datetime import datetime
-from typing import Iterable, List, Optional, Dict
-import json
 from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional
 
 # Set web server mode to enable graceful startup without token
 os.environ["WEB_SERVER_MODE"] = "1"
 import re
-import webvtt
- 
 
-from fastapi import FastAPI, File, UploadFile, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+import webvtt
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.utils import GatedRepoError
 
 # Add support for getting audio file duration
 try:
-    from pydub import AudioSegment
-    _HAS_PYDUB = True
+  from pydub import AudioSegment
+  _HAS_PYDUB = True
 except ImportError:
-    _HAS_PYDUB = False
+  _HAS_PYDUB = False
 
 
 # Token storage functions
 def _get_config_dir() -> Path:
-    """Get the directory where config files are stored"""
-    # Use the already-resolved TRANSCRIPTION_DIR so saved config lives where the server reads it
-    try:
-        config_base = TRANSCRIPTION_DIR
-    except NameError:
-        # Fallback only during early import when TRANSCRIPTION_DIR hasn't been set yet
-        config_base = Path(os.getenv("TRANSCRIPTION_DIR", str(Path(__file__).resolve().parent.parent / "mercuryscribe")))
-    config_dir = Path(config_base) / ".config"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
+  """Get the directory where config files are stored"""
+  # Use the already-resolved TRANSCRIPTION_DIR so saved config lives where the server reads it
+  try:
+    config_base = TRANSCRIPTION_DIR
+  except NameError:
+    # Fallback only during early import when TRANSCRIPTION_DIR hasn't been set yet
+    config_base = Path(
+        os.getenv("TRANSCRIPTION_DIR",
+                  str(Path(__file__).resolve().parent.parent / "mercuryscribe")))
+  config_dir = Path(config_base) / ".config"
+  config_dir.mkdir(parents=True, exist_ok=True)
+  return config_dir
+
 
 def _save_hf_token(token: str) -> None:
-    """Save Hugging Face token to config file"""
-    config_file = _get_config_dir() / "hf_token"
-    config_file.touch(mode=0o600)
-    normalized = token.strip()
-    config_file.write_text(normalized, encoding='utf-8')
-    config_file.chmod(0o600)
-    if normalized:
-        os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
+  """Save Hugging Face token to config file"""
+  config_file = _get_config_dir() / "hf_token"
+  config_file.touch(mode=0o600)
+  normalized = token.strip()
+  config_file.write_text(normalized, encoding='utf-8')
+  config_file.chmod(0o600)
+  if normalized:
+    os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
+
 
 def _load_hf_token() -> str | None:
-    """Load Hugging Face token from config file"""
-    config_file = _get_config_dir() / "hf_token"
-    if config_file.exists():
-        try:
-            token = config_file.read_text(encoding='utf-8').strip()
-            if token:
-                # Ensure any code relying on the environment sees the token as well
-                os.environ["HUGGING_FACE_AUTH_TOKEN"] = token
-                return token
-            return None
-        except (OSError, UnicodeDecodeError):
-            return None
-    return None
+  """Load Hugging Face token from config file"""
+  config_file = _get_config_dir() / "hf_token"
+  if config_file.exists():
+    try:
+      token = config_file.read_text(encoding='utf-8').strip()
+      if token:
+        # Ensure any code relying on the environment sees the token as well
+        os.environ["HUGGING_FACE_AUTH_TOKEN"] = token
+        return token
+      return None
+    except (OSError, UnicodeDecodeError):
+      return None
+  return None
+
 
 def _prime_token_env() -> str | None:
-    """Ensure HUGGING_FACE_AUTH_TOKEN is populated from env or saved file."""
-    env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
-    if env_token and env_token.strip():
-        normalized = env_token.strip()
-        os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
-        return normalized
+  """Ensure HUGGING_FACE_AUTH_TOKEN is populated from env or saved file."""
+  env_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+  if env_token and env_token.strip():
+    normalized = env_token.strip()
+    os.environ["HUGGING_FACE_AUTH_TOKEN"] = normalized
+    return normalized
 
-    file_token = _load_hf_token()
-    if file_token:
-        os.environ["HUGGING_FACE_AUTH_TOKEN"] = file_token
-        return file_token
+  file_token = _load_hf_token()
+  if file_token:
+    os.environ["HUGGING_FACE_AUTH_TOKEN"] = file_token
+    return file_token
 
-    return None
+  return None
 
 
 APP_DIR = Path(__file__).resolve().parent
 BRANDING_DIR = APP_DIR.parent / "branding"
-FAVICON_LINK_TAG = '<link rel="icon" type="image/svg+xml" href="/branding/mercuryscribe-logo.svg">' if BRANDING_DIR.exists() else ''
+FAVICON_LINK_TAG = '<link rel="icon" type="image/svg+xml" href="/branding/mercuryscribe-logo.svg">' if BRANDING_DIR.exists(
+) else ''
 
 
 def _inject_favicon(html: str) -> str:
-    """Insert the favicon link tag after the first </title> if available."""
-    if not FAVICON_LINK_TAG:
-        return html
-    return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
+  """Insert the favicon link tag after the first </title> if available."""
+  if not FAVICON_LINK_TAG:
+    return html
+  return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
+
 
 # Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to HOME ~/mercuryscribe
 # Prefer the user's home directory when available (both bundled and development). Only fall back
 # to repo-relative path when HOME/USERPROFILE is not set.
 home_dir = os.getenv("HOME") or os.getenv("USERPROFILE")
 if home_dir:
-    default_transcription_dir = Path(home_dir) / "mercuryscribe"
+  default_transcription_dir = Path(home_dir) / "mercuryscribe"
 else:
-    # If HOME isn't set, behave like a bundled app and try LOCALAPPDATA or APPDATA first,
-    # then finally fall back to a repo-relative path.
-    localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
-    if localapp:
-        default_transcription_dir = Path(localapp) / "MercuryScribe"
-    else:
-        default_transcription_dir = APP_DIR.parent / "mercuryscribe"
+  # If HOME isn't set, behave like a bundled app and try LOCALAPPDATA or APPDATA first,
+  # then finally fall back to a repo-relative path.
+  localapp = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+  if localapp:
+    default_transcription_dir = Path(localapp) / "MercuryScribe"
+  else:
+    default_transcription_dir = APP_DIR.parent / "mercuryscribe"
 
 TRANSCRIPTION_DIR = Path(
     os.getenv(
         "TRANSCRIPTION_DIR",
         os.getenv("UPLOAD_DIR", str(default_transcription_dir)),
-    )
-)
+    ))
 TRANSCRIPTION_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load saved token into environment if needed
@@ -125,32 +130,31 @@ _prime_token_env()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler for startup and shutdown events"""
-    # Startup
-    if os.getenv("SKIP_HF_STARTUP_CHECK") != "1":
-        if _has_valid_token():
-            print("Hugging Face token found and validated.")
-        else:
-            print("No valid Hugging Face token found. Users will be guided through setup.")
+  """Lifespan event handler for startup and shutdown events"""
+  # Startup
+  if os.getenv("SKIP_HF_STARTUP_CHECK") != "1":
+    if _has_valid_token():
+      print("Hugging Face token found and validated.")
     else:
-        print("Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
-    
-    yield
-    
-    # Shutdown (nothing to clean up for now)
+      print("No valid Hugging Face token found. Users will be guided through setup.")
+  else:
+    print("Skipping HF token startup check due to SKIP_HF_STARTUP_CHECK=1.")
+
+  yield
+
+  # Shutdown (nothing to clean up for now)
 
 
 app = FastAPI(title="MercuryScribe (Web)", lifespan=lifespan)
 app.mount("/files", StaticFiles(directory=str(TRANSCRIPTION_DIR)), name="files")
 if BRANDING_DIR.exists():
-    app.mount("/branding", StaticFiles(directory=str(BRANDING_DIR)), name="branding")
+  app.mount("/branding", StaticFiles(directory=str(BRANDING_DIR)), name="branding")
 else:
-    print("Branding directory not found; favicon will be unavailable.")
+  print("Branding directory not found; favicon will be unavailable.")
 
 # Simple in-memory job tracking
 jobs: Dict[str, dict] = {}
 job_counter = 0
-
 
 INDEX_HTML = """
 <!doctype html>
@@ -431,127 +435,127 @@ SETUP_HTML = """
 
 @app.get("/", response_class=HTMLResponse)
 async def index(_: Request):
-    if not _has_valid_token():
-        return RedirectResponse(url="/setup", status_code=303)
-    return HTMLResponse(_inject_favicon(INDEX_HTML))
+  if not _has_valid_token():
+    return RedirectResponse(url="/setup", status_code=303)
+  return HTMLResponse(_inject_favicon(INDEX_HTML))
 
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup_page(_: Request):
-    return HTMLResponse(_render_setup_html())
+  return HTMLResponse(_render_setup_html())
 
 
 @app.post("/api/save-token")
 async def save_token(request: Request):
-    """Save and validate the Hugging Face token"""
-    try:
-        data = await request.json()
-        token = data.get("token", "").strip()
-        
-        if not token:
-            return {"success": False, "error": "Token is required"}
-        
-        # Validate the token
-        validation = _validate_hf_token(token)
-        if not validation["valid"]:
-            return {
-                "success": False,
-                "error": validation.get("error"),
-                "missing_models": validation.get("missing_models", []),
-                "requires_license_acceptance": validation.get("requires_license_acceptance", False),
-            }
-        
-        # Save the token
-        _save_hf_token(token)
-        return {
-            "success": True,
-            "message": "Token saved and validated successfully",
-            "missing_models": [],
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Failed to save token: {str(e)}"}
+  """Save and validate the Hugging Face token"""
+  try:
+    data = await request.json()
+    token = data.get("token", "").strip()
+
+    if not token:
+      return {"success": False, "error": "Token is required"}
+
+    # Validate the token
+    validation = _validate_hf_token(token)
+    if not validation["valid"]:
+      return {
+          "success": False,
+          "error": validation.get("error"),
+          "missing_models": validation.get("missing_models", []),
+          "requires_license_acceptance": validation.get("requires_license_acceptance", False),
+      }
+
+    # Save the token
+    _save_hf_token(token)
+    return {
+        "success": True,
+        "message": "Token saved and validated successfully",
+        "missing_models": [],
+    }
+
+  except Exception as e:
+    return {"success": False, "error": f"Failed to save token: {str(e)}"}
 
 
 @app.get("/api/check-token")
 async def check_token():
-    """Check if we have a valid token"""
-    return {"has_token": _has_valid_token()}
+  """Check if we have a valid token"""
+  return {"has_token": _has_valid_token()}
 
 
 @app.post("/api/test-token")
 async def test_token(request: Request):
-    """Test a token without saving it - useful for testing different scenarios"""
-    try:
-        data = await request.json()
-        token = data.get("token", "").strip()
-        force_no_access = data.get("force_no_access", False)  # For testing
-        
-        if not token:
-            return {"success": False, "error": "No token provided"}
-        
-        # Special test scenarios
-        if force_no_access or token.startswith("hf_test_no_access"):
-            required_models = _get_required_hf_models()
-            error_suffix = "; ".join(
-                f"{model['name']} (access denied - you may need to accept the license)"
-                for model in required_models
-            )
-            return {
-                "success": False,
-                "error": f"Cannot access required models: {error_suffix}",
-                "requires_license_acceptance": True,
-                "missing_models": [
-                    {
-                        "name": model["name"],
-                        "url": model["url"],
-                        "reason": "access denied - you may need to accept the license",
-                    }
-                    for model in required_models
-                ],
-            }
-        
-        # Validate the token
-        validation = _validate_hf_token(token)
-        return {
-            "success": validation["valid"],
-            "error": validation.get("error"),
-            "message": validation.get("message"),
-            "missing_models": validation.get("missing_models", []),
-            "requires_license_acceptance": validation.get("requires_license_acceptance", False)
-        }
-        
-    except Exception as e:
-        return {"success": False, "error": f"Failed to test token: {str(e)}"}
+  """Test a token without saving it - useful for testing different scenarios"""
+  try:
+    data = await request.json()
+    token = data.get("token", "").strip()
+    force_no_access = data.get("force_no_access", False)  # For testing
+
+    if not token:
+      return {"success": False, "error": "No token provided"}
+
+    # Special test scenarios
+    if force_no_access or token.startswith("hf_test_no_access"):
+      required_models = _get_required_hf_models()
+      error_suffix = "; ".join(
+          f"{model['name']} (access denied - you may need to accept the license)"
+          for model in required_models)
+      return {
+          "success":
+          False,
+          "error":
+          f"Cannot access required models: {error_suffix}",
+          "requires_license_acceptance":
+          True,
+          "missing_models": [{
+              "name": model["name"],
+              "url": model["url"],
+              "reason": "access denied - you may need to accept the license",
+          } for model in required_models],
+      }
+
+    # Validate the token
+    validation = _validate_hf_token(token)
+    return {
+        "success": validation["valid"],
+        "error": validation.get("error"),
+        "message": validation.get("message"),
+        "missing_models": validation.get("missing_models", []),
+        "requires_license_acceptance": validation.get("requires_license_acceptance", False)
+    }
+
+  except Exception as e:
+    return {"success": False, "error": f"Failed to test token: {str(e)}"}
 
 
 @app.get("/api/job/{job_id}")
 async def get_job_status(job_id: str):
-    if job_id not in jobs:
-        return {"error": "Job not found"}, 404
-    return jobs[job_id]
+  if job_id not in jobs:
+    return {"error": "Job not found"}, 404
+  return jobs[job_id]
 
 
 @app.get("/progress/{job_id}", response_class=HTMLResponse)
 async def progress_page(job_id: str):
-    if job_id not in jobs:
-        return PlainTextResponse("Job not found", status_code=404)
+  if job_id not in jobs:
+    return PlainTextResponse("Job not found", status_code=404)
 
-    job = jobs[job_id]
-    
-    # Format start time
-    start_time = job.get('start_time', time.time())
-    start_time_str = datetime.fromtimestamp(start_time).strftime("%I:%M:%S %p")
-    
-    # Format audio duration
-    file_duration = job.get('file_duration')
-    if file_duration and file_duration != "Unknown duration":
-        duration_minutes = file_duration / 60
-        duration_str = f"{duration_minutes:.1f} minutes"
-    else:
-        duration_str = "Unknown duration"
-    
-    return HTMLResponse(_inject_favicon(f"""
+  job = jobs[job_id]
+
+  # Format start time
+  start_time = job.get('start_time', time.time())
+  start_time_str = datetime.fromtimestamp(start_time).strftime("%I:%M:%S %p")
+
+  # Format audio duration
+  file_duration = job.get('file_duration')
+  if file_duration and file_duration != "Unknown duration":
+    duration_minutes = file_duration / 60
+    duration_str = f"{duration_minutes:.1f} minutes"
+  else:
+    duration_str = "Unknown duration"
+
+  return HTMLResponse(
+      _inject_favicon(f"""
 <!doctype html>
 <html>
   <head>
@@ -658,707 +662,696 @@ async def progress_page(job_id: str):
 """))
 
 
-def _build_cli_cmd(
-    filename: str, 
-    speakers: Optional[List[str]] = None,
-    num_speakers: Optional[int] = None,
-    min_speakers: Optional[int] = None,
-    max_speakers: Optional[int] = None
-) -> List[str]:
-    """Use the python -m entry to invoke CLI installed from this same package."""
-    # When running unpacked/dev, invoke via the Python interpreter module form.
-    # When running as a frozen bundle, sys.executable is the bundled exe: use the bundle's --run-cli entry instead.
-    if getattr(sys, 'frozen', False):
-        # The bundle supports: MercuryScribe.exe --run-cli <args...>
-        cmd: List[str] = [sys.executable, "--run-cli"]
-        # Tag the invocation so the CLI can adjust behavior
-        cmd.append("--called-by-mercuryweb")
-        # Add speaker constraint flags after the portal flag below
-    else:
-        cmd: List[str] = [sys.executable, "-m", "transcribe_with_whisper.main", "--called-by-mercuryweb"]
-    
-    # Add speaker constraint flags
-    if num_speakers is not None:
-        cmd.extend(["--num-speakers", str(num_speakers)])
-    elif min_speakers is not None or max_speakers is not None:
-        if min_speakers is not None:
-            cmd.extend(["--min-speakers", str(min_speakers)])
-        if max_speakers is not None:
-            cmd.extend(["--max-speakers", str(max_speakers)])
-    
-    # Add filename (always after flags)
-    cmd.append(filename)
-    
-    # Add speaker names
-    if speakers:
-        cmd.extend(speakers)
-    
-    return cmd
+def _build_cli_cmd(filename: str,
+                   speakers: Optional[List[str]] = None,
+                   num_speakers: Optional[int] = None,
+                   min_speakers: Optional[int] = None,
+                   max_speakers: Optional[int] = None) -> List[str]:
+  """Use the python -m entry to invoke CLI installed from this same package."""
+  # When running unpacked/dev, invoke via the Python interpreter module form.
+  # When running as a frozen bundle, sys.executable is the bundled exe: use the bundle's --run-cli entry instead.
+  if getattr(sys, 'frozen', False):
+    # The bundle supports: MercuryScribe.exe --run-cli <args...>
+    cmd: List[str] = [sys.executable, "--run-cli"]
+    # Tag the invocation so the CLI can adjust behavior
+    cmd.append("--called-by-mercuryweb")
+    # Add speaker constraint flags after the portal flag below
+  else:
+    cmd: List[str] = [
+        sys.executable, "-m", "transcribe_with_whisper.main", "--called-by-mercuryweb"
+    ]
+
+  # Add speaker constraint flags
+  if num_speakers is not None:
+    cmd.extend(["--num-speakers", str(num_speakers)])
+  elif min_speakers is not None or max_speakers is not None:
+    if min_speakers is not None:
+      cmd.extend(["--min-speakers", str(min_speakers)])
+    if max_speakers is not None:
+      cmd.extend(["--max-speakers", str(max_speakers)])
+
+  # Add filename (always after flags)
+  cmd.append(filename)
+
+  # Add speaker names
+  if speakers:
+    cmd.extend(speakers)
+
+  return cmd
 
 
 _REQUIRED_MODELS_CACHE: Optional[List[Dict[str, str]]] = None
 
 
 def _determine_pyannote_major() -> int:
-    """Return the detected pyannote.audio major version (default to 4 if unavailable)."""
-    try:
-        import pyannote.audio  # type: ignore
+  """Return the detected pyannote.audio major version (default to 4 if unavailable)."""
+  try:
+    import pyannote.audio  # type: ignore
 
-        version = getattr(pyannote.audio, "__version__", "4.0.0")
-        major = int(str(version).split(".")[0])
-        return major if major > 0 else 4
-    except Exception:
-        return 4
+    version = getattr(pyannote.audio, "__version__", "4.0.0")
+    major = int(str(version).split(".")[0])
+    return major if major > 0 else 4
+  except Exception:
+    return 4
 
 
 def _get_required_hf_models() -> List[Dict[str, str]]:
-    """Determine the set of Hugging Face repositories required for the current pyannote stack."""
-    global _REQUIRED_MODELS_CACHE
-    if _REQUIRED_MODELS_CACHE is not None:
-        return _REQUIRED_MODELS_CACHE
+  """Determine the set of Hugging Face repositories required for the current pyannote stack."""
+  global _REQUIRED_MODELS_CACHE
+  if _REQUIRED_MODELS_CACHE is not None:
+    return _REQUIRED_MODELS_CACHE
 
-    major = _determine_pyannote_major()
-    models: List[Dict[str, str]] = [
-        {
-            "name": "pyannote/speaker-diarization-community-1",
-            "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
-            "description": "Speaker diarization checkpoints for pyannote.audio",
-            "probe_filename": "config.yaml",
-        }
-    ]
+  major = _determine_pyannote_major()
+  models: List[Dict[str, str]] = [{
+      "name": "pyannote/speaker-diarization-community-1",
+      "url": "https://huggingface.co/pyannote/speaker-diarization-community-1",
+      "description": "Speaker diarization checkpoints for pyannote.audio",
+      "probe_filename": "config.yaml",
+  }]
 
-    if major < 4:
-        models.append(
-            {
-                "name": "pyannote/speaker-diarization-3.1",
-                "url": "https://huggingface.co/pyannote/speaker-diarization-3.1",
-                "description": "Legacy diarization pipeline used with pyannote.audio 3.x",
-                "probe_filename": "config.yaml",
-            }
-        )
+  if major < 4:
+    models.append({
+        "name": "pyannote/speaker-diarization-3.1",
+        "url": "https://huggingface.co/pyannote/speaker-diarization-3.1",
+        "description": "Legacy diarization pipeline used with pyannote.audio 3.x",
+        "probe_filename": "config.yaml",
+    })
 
-    models.append(
-        {
-            "name": "pyannote/segmentation-3.0",
-            "url": "https://huggingface.co/pyannote/segmentation-3.0",
-            "description": "Voice activity segmentation for pyannote.audio",
-            "probe_filename": "config.yaml",
-        }
-    )
+  models.append({
+      "name": "pyannote/segmentation-3.0",
+      "url": "https://huggingface.co/pyannote/segmentation-3.0",
+      "description": "Voice activity segmentation for pyannote.audio",
+      "probe_filename": "config.yaml",
+  })
 
-    _REQUIRED_MODELS_CACHE = models
-    return models
+  _REQUIRED_MODELS_CACHE = models
+  return models
 
 
 def _render_setup_html() -> str:
-    """Render the setup page HTML with the correct model list injected."""
-    models = _get_required_hf_models()
+  """Render the setup page HTML with the correct model list injected."""
+  models = _get_required_hf_models()
 
-    list_items = []
-    for model in models:
-        description = model.get("description")
-        desc_suffix = f" – {description}" if description else ""
-        list_items.append(
-            f'        <li><a href="{model["url"]}" target="_blank">{model["name"]}</a>{desc_suffix}</li>'
-        )
-
-    model_json = json.dumps(
-        [
-            {
-                "name": model["name"],
-                "url": model["url"],
-                "reason": model.get("description", "access required"),
-            }
-            for model in models
-        ]
+  list_items = []
+  for model in models:
+    description = model.get("description")
+    desc_suffix = f" – {description}" if description else ""
+    list_items.append(
+        f'        <li><a href="{model["url"]}" target="_blank">{model["name"]}</a>{desc_suffix}</li>'
     )
 
-    html = SETUP_HTML
-    html = html.replace("__MODEL_LIST_ITEMS__", "\n".join(list_items))
-    html = html.replace("__MODEL_JSON__", model_json)
-    return _inject_favicon(html)
+  model_json = json.dumps([{
+      "name": model["name"],
+      "url": model["url"],
+      "reason": model.get("description", "access required"),
+  } for model in models])
+
+  html = SETUP_HTML
+  html = html.replace("__MODEL_LIST_ITEMS__", "\n".join(list_items))
+  html = html.replace("__MODEL_JSON__", model_json)
+  return _inject_favicon(html)
 
 
 def _probe_model_access(model: Dict[str, str], token: str) -> Optional[str]:
-    """Attempt to access a representative file in the model repo to verify gating status."""
-    filename = model.get("probe_filename", "config.yaml")
-    try:
-        # Download into an isolated temp directory so cached artifacts from previous tokens don't mask permission errors
-        with tempfile.TemporaryDirectory(prefix="hf_probe_") as tmpdir:
-            hf_hub_download(
-                repo_id=model["name"],
-                filename=filename,
-                token=token,
-                force_download=True,
-                cache_dir=tmpdir,
-                local_files_only=False,
-            )
-        return None
-    except GatedRepoError:
-        return "access denied - you may need to accept the license"
-    except Exception as exc:
-        return f"error fetching probe file '{filename}': {exc}"
+  """Attempt to access a representative file in the model repo to verify gating status."""
+  filename = model.get("probe_filename", "config.yaml")
+  try:
+    # Download into an isolated temp directory so cached artifacts from previous tokens don't mask permission errors
+    with tempfile.TemporaryDirectory(prefix="hf_probe_") as tmpdir:
+      hf_hub_download(
+          repo_id=model["name"],
+          filename=filename,
+          token=token,
+          force_download=True,
+          cache_dir=tmpdir,
+          local_files_only=False,
+      )
+    return None
+  except GatedRepoError:
+    return "access denied - you may need to accept the license"
+  except Exception as exc:
+    return f"error fetching probe file '{filename}': {exc}"
 
 
 def _validate_hf_token_or_die() -> None:
-    token = _prime_token_env()
-    if not token:
-        raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
-    try:
-        api = HfApi()
-        missing_models = []
-        for model in _get_required_hf_models():
-            try:
-                api.model_info(model["name"], token=token)
-            except Exception as exc:
-                missing_models.append(f"{model['name']} (error: {exc})")
-                continue
+  token = _prime_token_env()
+  if not token:
+    raise RuntimeError("HUGGING_FACE_AUTH_TOKEN is not set. Set it before starting the server.")
+  try:
+    api = HfApi()
+    missing_models = []
+    for model in _get_required_hf_models():
+      try:
+        api.model_info(model["name"], token=token)
+      except Exception as exc:
+        missing_models.append(f"{model['name']} (error: {exc})")
+        continue
 
-            probe_issue = _probe_model_access(model, token)
-            if probe_issue:
-                missing_models.append(f"{model['name']} ({probe_issue})")
-        if missing_models:
-            raise RuntimeError(
-                "Hugging Face token validation failed. Missing access to required models: "
-                + "; ".join(missing_models)
-            )
-        print("✅ Hugging Face token validated (all required models accessible).")
-    except Exception as e:
-        raise RuntimeError(
-            "Hugging Face token validation failed. Ensure the token is valid and has access to the required models. "
-            "Original error: " + str(e)
-        )
+      probe_issue = _probe_model_access(model, token)
+      if probe_issue:
+        missing_models.append(f"{model['name']} ({probe_issue})")
+    if missing_models:
+      raise RuntimeError(
+          "Hugging Face token validation failed. Missing access to required models: " +
+          "; ".join(missing_models))
+    print("✅ Hugging Face token validated (all required models accessible).")
+  except Exception as e:
+    raise RuntimeError(
+        "Hugging Face token validation failed. Ensure the token is valid and has access to the required models. "
+        "Original error: " + str(e))
+
 
 def _validate_hf_token(token: str) -> dict:
-    """Validate a Hugging Face token and return validation result"""
-    if not token:
-        return {"valid": False, "error": "Token is empty"}
-    
-    if not token.startswith("hf_"):
-        return {"valid": False, "error": "Invalid token format. HuggingFace tokens start with 'hf_'"}
-    
+  """Validate a Hugging Face token and return validation result"""
+  if not token:
+    return {"valid": False, "error": "Token is empty"}
+
+  if not token.startswith("hf_"):
+    return {"valid": False, "error": "Invalid token format. HuggingFace tokens start with 'hf_'"}
+
+  try:
+    api = HfApi()
+
+    # Test basic API access first
     try:
-        api = HfApi()
-        
-        # Test basic API access first
-        try:
-            # This should work with any valid token
-            api.whoami(token=token)
-        except Exception as e:
-            return {"valid": False, "error": f"Invalid token or API access denied: {str(e)}"}
-        
-        # Test access to required models
-        missing_models = []
-        requires_license_acceptance = False
-
-        for model in _get_required_hf_models():
-            try:
-                api.model_info(model["name"], token=token)
-            except Exception as e:
-                error_msg = str(e).lower()
-                if "not found" in error_msg or "repository not found" in error_msg:
-                    reason = "repository not found"
-                elif "access" in error_msg or "forbidden" in error_msg or "401" in error_msg:
-                    reason = "access denied - you may need to accept the license"
-                    requires_license_acceptance = True
-                else:
-                    reason = f"error: {str(e)}"
-
-                missing_models.append({
-                    "name": model["name"],
-                    "url": model["url"],
-                    "reason": reason,
-                })
-                continue
-
-            probe_issue = _probe_model_access(model, token)
-            if probe_issue:
-                if "access denied" in probe_issue:
-                    requires_license_acceptance = True
-                missing_models.append({
-                    "name": model["name"],
-                    "url": model["url"],
-                    "reason": probe_issue,
-                })
-
-        if missing_models:
-            missing_names = "; ".join(f"{model['name']} ({model['reason']})" for model in missing_models)
-            return {
-                "valid": False,
-                "error": f"Cannot access required models: {missing_names}",
-                "missing_models": missing_models,
-                "requires_license_acceptance": requires_license_acceptance,
-            }
-
-        return {
-            "valid": True,
-            "message": "Token validated successfully. All required models accessible.",
-            "missing_models": [],
-        }
-        
+      # This should work with any valid token
+      api.whoami(token=token)
     except Exception as e:
-        return {
-            "valid": False,
-            "error": f"Unexpected validation error: {str(e)}",
-            "missing_models": [],
-        }
+      return {"valid": False, "error": f"Invalid token or API access denied: {str(e)}"}
+
+    # Test access to required models
+    missing_models = []
+    requires_license_acceptance = False
+
+    for model in _get_required_hf_models():
+      try:
+        api.model_info(model["name"], token=token)
+      except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "repository not found" in error_msg:
+          reason = "repository not found"
+        elif "access" in error_msg or "forbidden" in error_msg or "401" in error_msg:
+          reason = "access denied - you may need to accept the license"
+          requires_license_acceptance = True
+        else:
+          reason = f"error: {str(e)}"
+
+        missing_models.append({
+            "name": model["name"],
+            "url": model["url"],
+            "reason": reason,
+        })
+        continue
+
+      probe_issue = _probe_model_access(model, token)
+      if probe_issue:
+        if "access denied" in probe_issue:
+          requires_license_acceptance = True
+        missing_models.append({
+            "name": model["name"],
+            "url": model["url"],
+            "reason": probe_issue,
+        })
+
+    if missing_models:
+      missing_names = "; ".join(f"{model['name']} ({model['reason']})" for model in missing_models)
+      return {
+          "valid": False,
+          "error": f"Cannot access required models: {missing_names}",
+          "missing_models": missing_models,
+          "requires_license_acceptance": requires_license_acceptance,
+      }
+
+    return {
+        "valid": True,
+        "message": "Token validated successfully. All required models accessible.",
+        "missing_models": [],
+    }
+
+  except Exception as e:
+    return {
+        "valid": False,
+        "error": f"Unexpected validation error: {str(e)}",
+        "missing_models": [],
+    }
+
 
 def _has_valid_token() -> bool:
-    """Check if a valid token exists (graceful version that doesn't crash)"""
-    token = _prime_token_env()
-    if not token:
-        return False
-    
-    result = _validate_hf_token(token)
-    return result.get("valid", False)
+  """Check if a valid token exists (graceful version that doesn't crash)"""
+  token = _prime_token_env()
+  if not token:
+    return False
+
+  result = _validate_hf_token(token)
+  return result.get("valid", False)
 
 
 def _human_size(n: int) -> str:
-    for unit in ["B", "KB", "MB", "GB", "TB"]:
-        if n < 1024:
-            return f"{n:.0f} {unit}"
-        n /= 1024
-    return f"{n:.0f} PB"
+  for unit in ["B", "KB", "MB", "GB", "TB"]:
+    if n < 1024:
+      return f"{n:.0f} {unit}"
+    n /= 1024
+  return f"{n:.0f} PB"
 
 
 def _list_dir_entries(path: Path) -> Iterable[Path]:
-    return sorted([p for p in path.iterdir() if p.is_file()], key=lambda p: p.name.lower())
+  return sorted([p for p in path.iterdir() if p.is_file()], key=lambda p: p.name.lower())
 
 
 def _get_audio_duration(file_path: Path) -> Optional[float]:
-    """Get duration of audio/video file in seconds"""
-    try:
-        if _HAS_PYDUB:
-            # Try pydub first (more reliable for various formats)
-            audio = AudioSegment.from_file(str(file_path))
-            return len(audio) / 1000.0  # Convert ms to seconds
-        else:
-            # Fallback to ffprobe if pydub not available
-            result = subprocess.run([
-                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1', str(file_path)
-            ], capture_output=True, text=True)
-            if result.returncode == 0 and result.stdout.strip():
-                return float(result.stdout.strip())
-    except Exception:
-        pass
-    return None
+  """Get duration of audio/video file in seconds"""
+  try:
+    if _HAS_PYDUB:
+      # Try pydub first (more reliable for various formats)
+      audio = AudioSegment.from_file(str(file_path))
+      return len(audio) / 1000.0  # Convert ms to seconds
+    else:
+      # Fallback to ffprobe if pydub not available
+      result = subprocess.run([
+          'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of',
+          'default=noprint_wrappers=1:nokey=1',
+          str(file_path)
+      ],
+                              capture_output=True,
+                              text=True)
+      if result.returncode == 0 and result.stdout.strip():
+        return float(result.stdout.strip())
+  except Exception:
+    pass
+  return None
 
 
 def _format_duration(seconds: float) -> str:
-    """Format duration in seconds to MM:SS format"""
-    minutes = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{minutes}:{secs:02d}"
+  """Format duration in seconds to MM:SS format"""
+  minutes = int(seconds // 60)
+  secs = int(seconds % 60)
+  return f"{minutes}:{secs:02d}"
 
 
 def _format_elapsed_time(start_time: float) -> str:
-    """Format elapsed time since start_time"""
-    elapsed = time.time() - start_time
-    if elapsed < 60:
-        return f"{elapsed:.0f}s"
-    else:
-        minutes = int(elapsed // 60)
-        seconds = int(elapsed % 60)
-        return f"{minutes}m {seconds}s"
-
-
-
+  """Format elapsed time since start_time"""
+  elapsed = time.time() - start_time
+  if elapsed < 60:
+    return f"{elapsed:.0f}s"
+  else:
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+    return f"{minutes}m {seconds}s"
 
 
 def _update_progress_from_output(job_id: str, line: str):
-    """Parse CLI output line and update job progress"""
-    global jobs
-    
-    if job_id not in jobs:
-        return
-    
-    line = line.strip()
-    if not line:
-        return
-    
-    # Progress estimation based on recognizable output patterns
-    try:
-        # Phase 1: Initial setup and preflight (5-10%)
-        if "Running preflight checks" in line:
-            jobs[job_id]["progress"] = 5
-            jobs[job_id]["message"] = "Running preflight checks..."
-        elif "ffmpeg found:" in line:
-            jobs[job_id]["progress"] = 7
-            jobs[job_id]["message"] = "Checking system dependencies..."
-        elif "All checks passed" in line:
-            jobs[job_id]["progress"] = 10
-            jobs[job_id]["message"] = "System checks complete..."
-        
-        # Phase 2: Audio processing (10-20%)
-        elif "Input #0" in line and ("mp3" in line or "mp4" in line or "wav" in line):
-            jobs[job_id]["progress"] = 12
-            jobs[job_id]["message"] = "Reading input audio/video..."
-        elif "ffmpeg" in line and "size=" in line and "time=" in line:
-            jobs[job_id]["progress"] = 18
-            jobs[job_id]["message"] = "Converting audio format..."
-        
-        # Phase 3: AI model loading (20-25%)
-        elif "Loading Whisper model" in line:
-            jobs[job_id]["progress"] = 22
-            jobs[job_id]["message"] = "Loading Whisper AI model..."
-        elif "Pipeline.from_pretrained" in line or "pyannote" in line:
-            jobs[job_id]["progress"] = 25
-            # Enhanced message with file duration
-            file_duration = jobs[job_id].get("file_duration", "Unknown duration")
-            duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
-            jobs[job_id]["message"] = f"Loading speaker diarization model for {duration_str} audio file..."
-        
-        # Phase 4: Speaker diarization (25-50%) - Longest phase
-        elif "DEMO_FILE" in line or "diarization" in line.lower():
-            # Check for specific diarization progress steps
-            if "Diarization progress:" in line:
-                # Parse chunk progress like "processing chunk 50/200 (25%)"
-                if "processing chunk" in line and "/" in line:
-                    try:
-                        # Extract percentage from the message
-                        percent_match = re.search(r'\((\d+)%\)', line)
-                        if percent_match:
-                            chunk_percent = int(percent_match.group(1))
-                            # Map 0-100% chunk progress to 30-45% overall progress
-                            mapped_progress = 30 + (chunk_percent * 0.15)  # 15% of total progress
-                            jobs[job_id]["progress"] = min(int(mapped_progress), 45)
-                            jobs[job_id]["message"] = f"Speaker diarization: {chunk_percent}% complete..."
-                    except (ValueError, AttributeError):
-                        pass
-                else:
-                    # Step-level progress messages
-                    step_name = line.split("Diarization progress:")[-1].strip()
-                    # Map common steps to progress percentages
-                    step_progress_map = {
-                        "segmentation": 30,
-                        "speaker_embedding": 35,
-                        "embeddings": 40,
-                        "clustering": 45,
-                    }
-                    for keyword, progress in step_progress_map.items():
-                        if keyword in step_name.lower():
-                            jobs[job_id]["progress"] = progress
-                            jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
-                            break
-                    else:
-                        # Generic diarization progress
-                        current = jobs[job_id]["progress"]
-                        if current < 50:
-                            jobs[job_id]["progress"] = min(current + 2, 50)
-                            jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
-            else:
-                jobs[job_id]["progress"] = 30
-                # Enhanced message with file duration and elapsed time
-                file_duration = jobs[job_id].get("file_duration", "Unknown duration")
-                start_time = jobs[job_id].get("start_time", time.time())
-                elapsed_time = time.time() - start_time
-                
-                duration_str = _format_duration(file_duration) if file_duration != "Unknown duration" else file_duration
-                elapsed_str = _format_elapsed_time(elapsed_time)
-                
-                jobs[job_id]["message"] = f"Running speaker diarization AI on {duration_str} audio file... (elapsed: {elapsed_str})"
-        elif "Detected speakers:" in line:
-            jobs[job_id]["progress"] = 50
-            # Extract speaker information for better UX
-            if "[" in line and "]" in line:
-                speaker_part = line.split("Detected speakers:")[1].strip()
-                jobs[job_id]["message"] = f"Speaker diarization complete - {speaker_part}"
-            else:
-                jobs[job_id]["message"] = "Speaker diarization complete..."
-        
-        # Phase 5: Segment transcription (50-80%)
-        # Now we get real progress from "Transcribing segment X/Y" messages
-        elif "Transcribing segment" in line and "/" in line:
-            try:
-                # Extract current/total from "Transcribing segment 3/10: 0.wav"
-                segment_part = line.split("Transcribing segment")[1].strip()
-                current, total = segment_part.split(":")[0].split("/")
-                current_num = int(current.strip())
-                total_num = int(total.strip())
-                
-                # Map segment progress to 50-80% range
-                segment_progress = (current_num / total_num) * 100
-                mapped_progress = 50 + (segment_progress * 0.30)  # 30% of total progress
-                jobs[job_id]["progress"] = min(int(mapped_progress), 80)
-                jobs[job_id]["message"] = f"Transcribing segment {current_num}/{total_num}..."
-            except (ValueError, IndexError):
-                # Fallback if parsing fails
-                current = jobs[job_id]["progress"]
-                jobs[job_id]["progress"] = min(current + 2, 80)
-                jobs[job_id]["message"] = "Transcribing audio segments..."
-        
-        elif "Completed segment" in line and "/" in line:
-            try:
-                # Extract current/total from "Completed segment 3/10"
-                segment_part = line.split("Completed segment")[1].strip()
-                current, total = segment_part.split("/")
-                current_num = int(current.strip())
-                total_num = int(total.strip())
-                
-                # Map segment progress to 50-80% range
-                segment_progress = (current_num / total_num) * 100
-                mapped_progress = 50 + (segment_progress * 0.30)
-                jobs[job_id]["progress"] = min(int(mapped_progress), 80)
-            except (ValueError, IndexError):
-                pass
-        
-        # Phase 6: HTML generation (80-95%)
-        elif "generate_html" in line or "Script completed successfully" in line:
-            jobs[job_id]["progress"] = 90
-            jobs[job_id]["message"] = "Generating HTML transcript..."
-        elif "Output:" in line and ".html" in line:
-            jobs[job_id]["progress"] = 95
-            jobs[job_id]["message"] = "Transcription complete, preparing files..."
-        
-        # Error detection
-        elif any(error_word in line.upper() for error_word in ["ERROR", "FAILED", "EXCEPTION", "TRACEBACK"]):
-            jobs[job_id]["message"] = f"Error: {line[:100]}..."
-        
-        # Progress safety: Ensure we never go backwards and don't stall
+  """Parse CLI output line and update job progress"""
+  global jobs
+
+  if job_id not in jobs:
+    return
+
+  line = line.strip()
+  if not line:
+    return
+
+  # Progress estimation based on recognizable output patterns
+  try:
+    # Phase 1: Initial setup and preflight (5-10%)
+    if "Running preflight checks" in line:
+      jobs[job_id]["progress"] = 5
+      jobs[job_id]["message"] = "Running preflight checks..."
+    elif "ffmpeg found:" in line:
+      jobs[job_id]["progress"] = 7
+      jobs[job_id]["message"] = "Checking system dependencies..."
+    elif "All checks passed" in line:
+      jobs[job_id]["progress"] = 10
+      jobs[job_id]["message"] = "System checks complete..."
+
+    # Phase 2: Audio processing (10-20%)
+    elif "Input #0" in line and ("mp3" in line or "mp4" in line or "wav" in line):
+      jobs[job_id]["progress"] = 12
+      jobs[job_id]["message"] = "Reading input audio/video..."
+    elif "ffmpeg" in line and "size=" in line and "time=" in line:
+      jobs[job_id]["progress"] = 18
+      jobs[job_id]["message"] = "Converting audio format..."
+
+    # Phase 3: AI model loading (20-25%)
+    elif "Loading Whisper model" in line:
+      jobs[job_id]["progress"] = 22
+      jobs[job_id]["message"] = "Loading Whisper AI model..."
+    elif "Pipeline.from_pretrained" in line or "pyannote" in line:
+      jobs[job_id]["progress"] = 25
+      # Enhanced message with file duration
+      file_duration = jobs[job_id].get("file_duration", "Unknown duration")
+      duration_str = _format_duration(
+          file_duration) if file_duration != "Unknown duration" else file_duration
+      jobs[job_id][
+          "message"] = f"Loading speaker diarization model for {duration_str} audio file..."
+
+    # Phase 4: Speaker diarization (25-50%) - Longest phase
+    elif "DEMO_FILE" in line or "diarization" in line.lower():
+      # Check for specific diarization progress steps
+      if "Diarization progress:" in line:
+        # Parse chunk progress like "processing chunk 50/200 (25%)"
+        if "processing chunk" in line and "/" in line:
+          try:
+            # Extract percentage from the message
+            percent_match = re.search(r'\((\d+)%\)', line)
+            if percent_match:
+              chunk_percent = int(percent_match.group(1))
+              # Map 0-100% chunk progress to 30-45% overall progress
+              mapped_progress = 30 + (chunk_percent * 0.15)  # 15% of total progress
+              jobs[job_id]["progress"] = min(int(mapped_progress), 45)
+              jobs[job_id]["message"] = f"Speaker diarization: {chunk_percent}% complete..."
+          except (ValueError, AttributeError):
+            pass
         else:
-            current_progress = jobs[job_id]["progress"]
-            # Very gradual increment for any other output (prevents stalling)
-            if current_progress < 85 and len(line) > 10:  # Only for substantive output
-                jobs[job_id]["progress"] = min(current_progress + 0.5, 85)
-    
-    except Exception as e:
-        # Don't let progress parsing errors break the job
+          # Step-level progress messages
+          step_name = line.split("Diarization progress:")[-1].strip()
+          # Map common steps to progress percentages
+          step_progress_map = {
+              "segmentation": 30,
+              "speaker_embedding": 35,
+              "embeddings": 40,
+              "clustering": 45,
+          }
+          for keyword, progress in step_progress_map.items():
+            if keyword in step_name.lower():
+              jobs[job_id]["progress"] = progress
+              jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
+              break
+          else:
+            # Generic diarization progress
+            current = jobs[job_id]["progress"]
+            if current < 50:
+              jobs[job_id]["progress"] = min(current + 2, 50)
+              jobs[job_id]["message"] = f"Speaker diarization: {step_name}..."
+      else:
+        jobs[job_id]["progress"] = 30
+        # Enhanced message with file duration and elapsed time
+        file_duration = jobs[job_id].get("file_duration", "Unknown duration")
+        start_time = jobs[job_id].get("start_time", time.time())
+        elapsed_time = time.time() - start_time
+
+        duration_str = _format_duration(
+            file_duration) if file_duration != "Unknown duration" else file_duration
+        elapsed_str = _format_elapsed_time(elapsed_time)
+
+        jobs[job_id][
+            "message"] = f"Running speaker diarization AI on {duration_str} audio file... (elapsed: {elapsed_str})"
+    elif "Detected speakers:" in line:
+      jobs[job_id]["progress"] = 50
+      # Extract speaker information for better UX
+      if "[" in line and "]" in line:
+        speaker_part = line.split("Detected speakers:")[1].strip()
+        jobs[job_id]["message"] = f"Speaker diarization complete - {speaker_part}"
+      else:
+        jobs[job_id]["message"] = "Speaker diarization complete..."
+
+    # Phase 5: Segment transcription (50-80%)
+    # Now we get real progress from "Transcribing segment X/Y" messages
+    elif "Transcribing segment" in line and "/" in line:
+      try:
+        # Extract current/total from "Transcribing segment 3/10: 0.wav"
+        segment_part = line.split("Transcribing segment")[1].strip()
+        current, total = segment_part.split(":")[0].split("/")
+        current_num = int(current.strip())
+        total_num = int(total.strip())
+
+        # Map segment progress to 50-80% range
+        segment_progress = (current_num / total_num) * 100
+        mapped_progress = 50 + (segment_progress * 0.30)  # 30% of total progress
+        jobs[job_id]["progress"] = min(int(mapped_progress), 80)
+        jobs[job_id]["message"] = f"Transcribing segment {current_num}/{total_num}..."
+      except (ValueError, IndexError):
+        # Fallback if parsing fails
+        current = jobs[job_id]["progress"]
+        jobs[job_id]["progress"] = min(current + 2, 80)
+        jobs[job_id]["message"] = "Transcribing audio segments..."
+
+    elif "Completed segment" in line and "/" in line:
+      try:
+        # Extract current/total from "Completed segment 3/10"
+        segment_part = line.split("Completed segment")[1].strip()
+        current, total = segment_part.split("/")
+        current_num = int(current.strip())
+        total_num = int(total.strip())
+
+        # Map segment progress to 50-80% range
+        segment_progress = (current_num / total_num) * 100
+        mapped_progress = 50 + (segment_progress * 0.30)
+        jobs[job_id]["progress"] = min(int(mapped_progress), 80)
+      except (ValueError, IndexError):
         pass
 
+    # Phase 6: HTML generation (80-95%)
+    elif "generate_html" in line or "Script completed successfully" in line:
+      jobs[job_id]["progress"] = 90
+      jobs[job_id]["message"] = "Generating HTML transcript..."
+    elif "Output:" in line and ".html" in line:
+      jobs[job_id]["progress"] = 95
+      jobs[job_id]["message"] = "Transcription complete, preparing files..."
 
-def _run_transcription_job(
-    job_id: str, 
-    filename: str, 
-    speakers: Optional[List[str]],
-    num_speakers: Optional[int] = None,
-    min_speakers: Optional[int] = None,
-    max_speakers: Optional[int] = None
-):
-    global jobs
-    try:
-        # Store basename for VTT progress tracking
-        basename = Path(filename).stem
-        jobs[job_id]["basename"] = basename
-        jobs[job_id]["status"] = "running"
-        jobs[job_id]["message"] = "Starting transcription..."
-        jobs[job_id]["progress"] = 5
+    # Error detection
+    elif any(error_word in line.upper()
+             for error_word in ["ERROR", "FAILED", "EXCEPTION", "TRACEBACK"]):
+      jobs[job_id]["message"] = f"Error: {line[:100]}..."
 
-        cmd = _build_cli_cmd(filename, speakers or None, num_speakers, min_speakers, max_speakers)
-        
-        # Debug logging
-        exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
-        log_path = os.path.join(exe_dir, "bundle_run.log")
-        with open(log_path, "a", encoding="utf-8") as fh:
-            fh.write(f"[_run_transcription_job] job_id: {job_id}, filename: {filename}, cmd: {cmd}\n")
-        
-        # Use Popen for real-time output monitoring
-        import subprocess
-        import threading
-        
-        # Prepare environment with token
-        env = os.environ.copy()
-        token = _prime_token_env()
-        if token:
-            env["HUGGING_FACE_AUTH_TOKEN"] = token
-        
-        # Ensure bundled ffmpeg is in PATH for subprocess
-        if getattr(sys, 'frozen', False):
-            exe_dir = Path(sys.executable).resolve().parent
-            internal_dir = exe_dir / "_internal"
-            current_path = env.get("PATH", "")
-            env["PATH"] = f"{exe_dir}{os.pathsep}{internal_dir}{os.pathsep}{current_path}"
-        
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(TRANSCRIPTION_DIR),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True,
-            env=env
-        )
-        
-        # Monitor output in real-time
-        output_lines = []
-        
-        def monitor_output():
-            nonlocal output_lines
-            for line in iter(proc.stdout.readline, ''):
-                if line:
-                    output_lines.append(line.strip())
-                    _update_progress_from_output(job_id, line.strip())
-        
-        monitor_thread = threading.Thread(target=monitor_output)
-        monitor_thread.daemon = True
-        monitor_thread.start()
-        
-        # Wait for process to complete
-        proc.wait()
-        monitor_thread.join(timeout=1)  # Give thread a moment to finish
-        
-        if proc.returncode != 0:
-            jobs[job_id]["status"] = "error"
-            jobs[job_id]["message"] = f"CLI failed with code {proc.returncode}"
-            jobs[job_id]["error"] = f"OUTPUT:\n" + "\n".join(output_lines)
-            return
+    # Progress safety: Ensure we never go backwards and don't stall
+    else:
+      current_progress = jobs[job_id]["progress"]
+      # Very gradual increment for any other output (prevents stalling)
+      if current_progress < 85 and len(line) > 10:  # Only for substantive output
+        jobs[job_id]["progress"] = min(current_progress + 0.5, 85)
 
-        jobs[job_id]["progress"] = 80
+  except Exception:
+    # Don't let progress parsing errors break the job
+    pass
 
-        basename = Path(filename).stem
-        html_out = TRANSCRIPTION_DIR / f"{basename}.html"
-        if not html_out.exists():
-            candidates = sorted(TRANSCRIPTION_DIR.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True)
-            if candidates:
-                html_out = candidates[0]
-            else:
-                jobs[job_id]["status"] = "error"
-                jobs[job_id]["message"] = "No HTML output found"
-                return
 
-        jobs[job_id]["message"] = "Generating DOCX file..."
-        jobs[job_id]["progress"] = 90
+def _run_transcription_job(job_id: str,
+                           filename: str,
+                           speakers: Optional[List[str]],
+                           num_speakers: Optional[int] = None,
+                           min_speakers: Optional[int] = None,
+                           max_speakers: Optional[int] = None):
+  global jobs
+  try:
+    # Store basename for VTT progress tracking
+    basename = Path(filename).stem
+    jobs[job_id]["basename"] = basename
+    jobs[job_id]["status"] = "running"
+    jobs[job_id]["message"] = "Starting transcription..."
+    jobs[job_id]["progress"] = 5
 
-        try:
-            docx_out = html_out.with_suffix('.docx')
-            try:
-                from transcribe_with_whisper.html_to_docx import convert_html_file_to_docx
-            except Exception as import_exc:
-                jobs[job_id]["status"] = "error"
-                jobs[job_id]["message"] = (
-                    "DOCX generation failed: required Python packages are missing. "
-                    "Install with: pip install python-docx"
-                )
-                jobs[job_id]["error"] = f"Import error for html_to_docx: {import_exc}"
-                print(f"⚠️ DOCX generation unavailable: {import_exc}")
-                return
+    cmd = _build_cli_cmd(filename, speakers or None, num_speakers, min_speakers, max_speakers)
 
-            try:
-                convert_html_file_to_docx(html_out, docx_out)
-                print(f"✅ Generated DOCX (shared): {docx_out.name}")
-            except Exception as py_exc:
-                jobs[job_id]["status"] = "error"
-                jobs[job_id]["message"] = "DOCX generation failed during conversion"
-                jobs[job_id]["error"] = f"Conversion error: {py_exc}"
-                print(f"⚠️ DOCX conversion failed: {py_exc}")
-        except Exception as e:
-            print(f"⚠️ DOCX generation failed: {e}")
+    # Debug logging
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+    log_path = os.path.join(exe_dir, "bundle_run.log")
+    with open(log_path, "a", encoding="utf-8") as fh:
+      fh.write(f"[_run_transcription_job] job_id: {job_id}, filename: {filename}, cmd: {cmd}\n")
 
-        jobs[job_id]["status"] = "completed"
-        jobs[job_id]["progress"] = 100
-        jobs[job_id]["end_time"] = time.time()
-        
-        # Calculate elapsed time for logging
-        elapsed = jobs[job_id]["end_time"] - jobs[job_id].get("start_time", jobs[job_id]["end_time"])
-        elapsed_str = _format_elapsed_time(jobs[job_id].get("start_time", jobs[job_id]["end_time"]))
-        end_time_str = datetime.fromtimestamp(jobs[job_id]["end_time"]).strftime("%I:%M:%S %p")
-        
-        jobs[job_id]["message"] = f"Transcription completed! (Finished at {end_time_str}, took {elapsed_str})"
-        jobs[job_id]["result"] = f"/files/{html_out.name}"
-        
-        print(f"✅ Transcription completed at {end_time_str}")
-        print(f"⏱️  Total elapsed time: {elapsed_str}")
-    except Exception as e:
+    # Use Popen for real-time output monitoring
+    import subprocess
+    import threading
+
+    # Prepare environment with token
+    env = os.environ.copy()
+    token = _prime_token_env()
+    if token:
+      env["HUGGING_FACE_AUTH_TOKEN"] = token
+
+    # Ensure bundled ffmpeg is in PATH for subprocess
+    if getattr(sys, 'frozen', False):
+      exe_dir = Path(sys.executable).resolve().parent
+      internal_dir = exe_dir / "_internal"
+      current_path = env.get("PATH", "")
+      env["PATH"] = f"{exe_dir}{os.pathsep}{internal_dir}{os.pathsep}{current_path}"
+
+    proc = subprocess.Popen(cmd,
+                            cwd=str(TRANSCRIPTION_DIR),
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            universal_newlines=True,
+                            env=env)
+
+    # Monitor output in real-time
+    output_lines = []
+
+    def monitor_output():
+      nonlocal output_lines
+      for line in iter(proc.stdout.readline, ''):
+        if line:
+          output_lines.append(line.strip())
+          _update_progress_from_output(job_id, line.strip())
+
+    monitor_thread = threading.Thread(target=monitor_output)
+    monitor_thread.daemon = True
+    monitor_thread.start()
+
+    # Wait for process to complete
+    proc.wait()
+    monitor_thread.join(timeout=1)  # Give thread a moment to finish
+
+    if proc.returncode != 0:
+      jobs[job_id]["status"] = "error"
+      jobs[job_id]["message"] = f"CLI failed with code {proc.returncode}"
+      jobs[job_id]["error"] = "OUTPUT:\n" + "\n".join(output_lines)
+      return
+
+    jobs[job_id]["progress"] = 80
+
+    basename = Path(filename).stem
+    html_out = TRANSCRIPTION_DIR / f"{basename}.html"
+    if not html_out.exists():
+      candidates = sorted(TRANSCRIPTION_DIR.glob("*.html"),
+                          key=lambda p: p.stat().st_mtime,
+                          reverse=True)
+      if candidates:
+        html_out = candidates[0]
+      else:
         jobs[job_id]["status"] = "error"
-        jobs[job_id]["message"] = f"Failed to run transcription: {e}"
+        jobs[job_id]["message"] = "No HTML output found"
+        return
+
+    jobs[job_id]["message"] = "Generating DOCX file..."
+    jobs[job_id]["progress"] = 90
+
+    try:
+      docx_out = html_out.with_suffix('.docx')
+      try:
+        from transcribe_with_whisper.html_to_docx import \
+          convert_html_file_to_docx
+      except Exception as import_exc:
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["message"] = ("DOCX generation failed: required Python packages are missing. "
+                                   "Install with: pip install python-docx")
+        jobs[job_id]["error"] = f"Import error for html_to_docx: {import_exc}"
+        print(f"⚠️ DOCX generation unavailable: {import_exc}")
+        return
+
+      try:
+        convert_html_file_to_docx(html_out, docx_out)
+        print(f"✅ Generated DOCX (shared): {docx_out.name}")
+      except Exception as py_exc:
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["message"] = "DOCX generation failed during conversion"
+        jobs[job_id]["error"] = f"Conversion error: {py_exc}"
+        print(f"⚠️ DOCX conversion failed: {py_exc}")
+    except Exception as e:
+      print(f"⚠️ DOCX generation failed: {e}")
+
+    jobs[job_id]["status"] = "completed"
+    jobs[job_id]["progress"] = 100
+    jobs[job_id]["end_time"] = time.time()
+
+    # Calculate elapsed time for logging
+    # elapsed = jobs[job_id]["end_time"] - jobs[job_id].get("start_time", jobs[job_id]["end_time"])
+    elapsed_str = _format_elapsed_time(jobs[job_id].get("start_time", jobs[job_id]["end_time"]))
+    end_time_str = datetime.fromtimestamp(jobs[job_id]["end_time"]).strftime("%I:%M:%S %p")
+
+    jobs[job_id][
+        "message"] = f"Transcription completed! (Finished at {end_time_str}, took {elapsed_str})"
+    jobs[job_id]["result"] = f"/files/{html_out.name}"
+
+    print(f"✅ Transcription completed at {end_time_str}")
+    print(f"⏱️  Total elapsed time: {elapsed_str}")
+  except Exception as e:
+    jobs[job_id]["status"] = "error"
+    jobs[job_id]["message"] = f"Failed to run transcription: {e}"
 
 
 @app.post("/upload")
-async def upload(
-    file: UploadFile = File(...), 
-    speaker: Optional[List[str]] = Form(default=None),
-    num_speakers: Optional[str] = Form(default=None),
-    min_speakers: Optional[str] = Form(default=None),
-    max_speakers: Optional[str] = Form(default=None)
-):
-    global job_counter, jobs
-    if not _prime_token_env():
-        return PlainTextResponse(
-            "HUGGING_FACE_AUTH_TOKEN not set. Set it when running the server.", status_code=500
-        )
+async def upload(file: UploadFile = File(...),
+                 speaker: Optional[List[str]] = Form(default=None),
+                 num_speakers: Optional[str] = Form(default=None),
+                 min_speakers: Optional[str] = Form(default=None),
+                 max_speakers: Optional[str] = Form(default=None)):
+  global job_counter, jobs
+  if not _prime_token_env():
+    return PlainTextResponse("HUGGING_FACE_AUTH_TOKEN not set. Set it when running the server.",
+                             status_code=500)
 
-    dest_path = TRANSCRIPTION_DIR / file.filename
-    with dest_path.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+  dest_path = TRANSCRIPTION_DIR / file.filename
+  with dest_path.open("wb") as out:
+    shutil.copyfileobj(file.file, out)
 
-    job_counter += 1
-    job_id = str(job_counter)
-    speakers = [s.strip() for s in (speaker or []) if s and s.strip()]
-    
-    # Parse and validate speaker constraints (handle empty strings from form)
-    num_speakers_int = None
-    min_speakers_int = None
-    max_speakers_int = None
-    
-    try:
-        if num_speakers and num_speakers.strip():
-            num_speakers_int = int(num_speakers)
-        if min_speakers and min_speakers.strip():
-            min_speakers_int = int(min_speakers)
-        if max_speakers and max_speakers.strip():
-            max_speakers_int = int(max_speakers)
-    except ValueError as e:
-        return PlainTextResponse(f"Invalid speaker number: {e}", status_code=400)
+  job_counter += 1
+  job_id = str(job_counter)
+  speakers = [s.strip() for s in (speaker or []) if s and s.strip()]
 
-    # Get audio duration for progress feedback
-    file_duration = _get_audio_duration(dest_path)
-    
-    jobs[job_id] = {
-        "status": "starting",
-        "progress": 0,
-        "message": "Preparing transcription...",
-        "filename": file.filename,
-        "start_time": time.time(),
-        "file_duration": file_duration,
-    }
+  # Parse and validate speaker constraints (handle empty strings from form)
+  num_speakers_int = None
+  min_speakers_int = None
+  max_speakers_int = None
 
-    thread = threading.Thread(
-        target=_run_transcription_job, 
-        args=(job_id, file.filename, speakers, num_speakers_int, min_speakers_int, max_speakers_int)
-    )
-    thread.daemon = True
-    thread.start()
+  try:
+    if num_speakers and num_speakers.strip():
+      num_speakers_int = int(num_speakers)
+    if min_speakers and min_speakers.strip():
+      min_speakers_int = int(min_speakers)
+    if max_speakers and max_speakers.strip():
+      max_speakers_int = int(max_speakers)
+  except ValueError as e:
+    return PlainTextResponse(f"Invalid speaker number: {e}", status_code=400)
 
-    return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
+  # Get audio duration for progress feedback
+  file_duration = _get_audio_duration(dest_path)
+
+  jobs[job_id] = {
+      "status": "starting",
+      "progress": 0,
+      "message": "Preparing transcription...",
+      "filename": file.filename,
+      "start_time": time.time(),
+      "file_duration": file_duration,
+  }
+
+  thread = threading.Thread(target=_run_transcription_job,
+                            args=(job_id, file.filename, speakers, num_speakers_int,
+                                  min_speakers_int, max_speakers_int))
+  thread.daemon = True
+  thread.start()
+
+  return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
 
 
 @app.get("/list", response_class=HTMLResponse)
 async def list_files(_: Request):
-    files = _list_dir_entries(TRANSCRIPTION_DIR)
-    rows = []
-    media_exts = {".mp4", ".m4a", ".wav", ".mp3", ".mkv", ".mov"}
-    for p in files:
-        name = p.name
-        size = _human_size(p.stat().st_size)
-        mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-        actions = []
+  files = _list_dir_entries(TRANSCRIPTION_DIR)
+  rows = []
+  media_exts = {".mp4", ".m4a", ".wav", ".mp3", ".mkv", ".mov"}
+  vtt_dir = TRANSCRIPTION_DIR / "vtt"
+  for p in files:
+    name = p.name
+    size = _human_size(p.stat().st_size)
+    mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+    actions = []
 
-        # HTML outputs: View (and Edit/Regenerate if VTTs exist)
-        if p.suffix.lower() == ".html":
-            actions.append(f'<a href="/files/{name}">View</a>')
-            basename = p.stem
-            vtt_dir = TRANSCRIPTION_DIR / basename
+    # HTML outputs: View (and Edit/Regenerate if VTTs exist)
+    if p.suffix.lower() == ".html":
+      actions.append(f'<a href="/files/{name}">View</a>')
+      basename = p.stem
+      # vtt_dir = TRANSCRIPTION_DIR / basename
 
-        # Media inputs: allow Re-run
-        if p.suffix.lower() in media_exts:
-            actions.append(
-                f'<form method="post" action="/rerun" style="display:inline">'
-                f'<input type="hidden" name="filename" value="{name}">' \
-                f'<button type="submit">Process</button></form>'
-            )
+    # Media inputs: allow Re-run
+    if p.suffix.lower() in media_exts:
+      actions.append(
+          f'<form method="post" action="/rerun" style="display:inline">'
+          f'<input type="hidden" name="filename" value="{name}">' \
+          f'<button type="submit">Process</button></form>'
+      )
 
-        # Download links (strong for DOCX)
-        if p.suffix.lower() == ".docx":
-            actions.append(f'<a href="/files/{name}" download><strong>📄 Download DOCX</strong></a>')
-        else:
-            actions.append(f'<a href="/files/{name}" download>Download</a>')
+    # Download links (strong for DOCX)
+    if p.suffix.lower() == ".docx":
+      actions.append(f'<a href="/files/{name}" download><strong>📄 Download DOCX</strong></a>')
+    else:
+      actions.append(f'<a href="/files/{name}" download>Download</a>')
 
-        rows.append(
-            f"<tr><td>{name}</td><td style='text-align:right'>{size}</td><td>{mtime}</td><td>{' | '.join(actions)}</td></tr>"
-        )
+    rows.append(
+        f"<tr><td>{name}</td><td style='text-align:right'>{size}</td><td>{mtime}</td><td>{' | '.join(actions)}</td></tr>"
+    )
 
-    html = _inject_favicon(f"""
+  html = _inject_favicon(f"""
 <!doctype html>
 <html>
   <head>
@@ -1384,196 +1377,188 @@ async def list_files(_: Request):
   </body>
 </html>
 """)
-    return HTMLResponse(html)
+  return HTMLResponse(html)
 
 
 @app.post("/rerun")
 async def rerun(filename: str = Form(...)):
-    """Re-run transcription for an existing media file in the transcription dir."""
-    global job_counter, jobs
+  """Re-run transcription for an existing media file in the transcription dir."""
+  global job_counter, jobs
 
-    target = (TRANSCRIPTION_DIR / filename).resolve()
-    if not target.exists() or target.parent != TRANSCRIPTION_DIR.resolve():
-        return PlainTextResponse("Invalid file.", status_code=400)
+  target = (TRANSCRIPTION_DIR / filename).resolve()
+  if not target.exists() or target.parent != TRANSCRIPTION_DIR.resolve():
+    return PlainTextResponse("Invalid file.", status_code=400)
 
-    if target.suffix.lower() not in {".mp4", ".m4a", ".wav", ".mp3", ".mkv", ".mov"}:
-        return PlainTextResponse("Re-run is only supported for media files.", status_code=400)
+  if target.suffix.lower() not in {".mp4", ".m4a", ".wav", ".mp3", ".mkv", ".mov"}:
+    return PlainTextResponse("Re-run is only supported for media files.", status_code=400)
 
-    job_counter += 1
-    job_id = str(job_counter)
-    
-    # Get audio duration for progress feedback
-    file_duration = _get_audio_duration(target)
-    
-    jobs[job_id] = {
-        "status": "starting",
-        "progress": 0,
-        "message": "Preparing transcription...",
-        "filename": filename,
-        "start_time": time.time(),
-        "file_duration": file_duration,
-    }
+  job_counter += 1
+  job_id = str(job_counter)
 
-    thread = threading.Thread(
-        target=_run_transcription_job, 
-        args=(job_id, target.name, None, None, None, None)
-    )
-    thread.daemon = True
-    thread.start()
+  # Get audio duration for progress feedback
+  file_duration = _get_audio_duration(target)
 
-    return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
+  jobs[job_id] = {
+      "status": "starting",
+      "progress": 0,
+      "message": "Preparing transcription...",
+      "filename": filename,
+      "start_time": time.time(),
+      "file_duration": file_duration,
+  }
+
+  thread = threading.Thread(target=_run_transcription_job,
+                            args=(job_id, target.name, None, None, None, None))
+  thread.daemon = True
+  thread.start()
+
+  return RedirectResponse(url=f"/progress/{job_id}", status_code=303)
 
 
 def _load_transcript_data(basename: str):
-    """Load transcript data from VTT files for editing"""
-    vtt_dir = TRANSCRIPTION_DIR / basename
-    segments = []
+  """Load transcript data from VTT files for editing"""
+  vtt_dir = TRANSCRIPTION_DIR / basename
+  segments = []
 
-    if not vtt_dir.exists():
-        return {"segments": segments}
-
-    vtt_files = sorted(vtt_dir.glob("*.vtt"))
-    for vtt_file in vtt_files:
-        try:
-            captions = webvtt.read(str(vtt_file))
-            speaker_match = re.search(r"(\d+)\.vtt", vtt_file.name)
-            speaker_id = speaker_match.group(1) if speaker_match else "Unknown"
-            speaker_name = f"Speaker {int(speaker_id) + 1}" if speaker_id.isdigit() else speaker_id
-
-            for caption in captions:
-                segments.append({
-                    "speaker": speaker_name,
-                    "start_time": caption.start,
-                    "end_time": caption.end,
-                    "text": caption.text,
-                })
-        except Exception as e:
-            print(f"Error reading VTT file {vtt_file}: {e}")
-
-    segments.sort(key=lambda x: x["start_time"])
+  if not vtt_dir.exists():
     return {"segments": segments}
+
+  vtt_files = sorted(vtt_dir.glob("*.vtt"))
+  for vtt_file in vtt_files:
+    try:
+      captions = webvtt.read(str(vtt_file))
+      speaker_match = re.search(r"(\d+)\.vtt", vtt_file.name)
+      speaker_id = speaker_match.group(1) if speaker_match else "Unknown"
+      speaker_name = f"Speaker {int(speaker_id) + 1}" if speaker_id.isdigit() else speaker_id
+
+      for caption in captions:
+        segments.append({
+            "speaker": speaker_name,
+            "start_time": caption.start,
+            "end_time": caption.end,
+            "text": caption.text,
+        })
+    except Exception as e:
+      print(f"Error reading VTT file {vtt_file}: {e}")
+
+  segments.sort(key=lambda x: x["start_time"])
+  return {"segments": segments}
+
 
 ## /edit route removed
 
 
 @app.post("/save_transcript_edits/{basename}")
 async def save_in_place_transcript_edits(basename: str, request: Request):
-    """Save in-place edited transcript changes back to VTT files using precise VTT file and caption index"""
-    
-    # Enable debug logging if requested
-    debug = os.getenv("DEBUG_SAVE_EDITS") == "1"
-    
-    try:
-        data = await request.json()
-        changes = data.get("changes", [])
-        if not changes:
-            return {"success": False, "error": "No changes provided"}
+  """Save in-place edited transcript changes back to VTT files"""
 
-        vtt_dir = TRANSCRIPTION_DIR / basename
-        if not vtt_dir.exists():
-            return {"success": False, "error": f"Transcript directory not found: {basename}"}
+  # Enable debug logging if requested
+  debug = os.getenv("DEBUG_SAVE_EDITS") == "1"
 
+  try:
+    data = await request.json()
+    changes = data.get("changes", [])
+    if not changes:
+      return {"success": False, "error": "No changes provided"}
+
+    vtt_dir = TRANSCRIPTION_DIR / basename
+    if not vtt_dir.exists():
+      return {"success": False, "error": f"Transcript directory not found: {basename}"}
+
+    if debug:
+      print(f"[DEBUG] Processing {len(changes)} changes for {basename}")
+
+    # Track which VTT files we've modified
+    modified_files: set[Path] = set()
+    applied = 0
+    failed: List[dict] = []
+
+    for change in changes:
+      # Extract VTT-specific information from the change
+      vtt_file = change.get("vttFile", "").strip()
+      caption_idx_str = change.get("captionIdx", "").strip()
+      new_text = change.get("text", "").strip()
+
+      if debug:
+        print(
+            f"[DEBUG] Change: vttFile='{vtt_file}', captionIdx='{caption_idx_str}', text='{new_text[:50]}...'"
+        )
+
+      # Validate that we have the required VTT-specific information
+      if not vtt_file or not caption_idx_str:
         if debug:
-            print(f"[DEBUG] Processing {len(changes)} changes for {basename}")
+          print("[DEBUG] Missing VTT info, skipping change")
+        failed.append({
+            "error": "Missing vttFile or captionIdx - HTML may be from legacy version",
+            "change": change
+        })
+        continue
 
-        # Track which VTT files we've modified
-        modified_files: set[Path] = set()
-        applied = 0
-        failed: List[dict] = []
-
-        for change in changes:
-            # Extract VTT-specific information from the change
-            vtt_file = change.get("vttFile", "").strip()
-            caption_idx_str = change.get("captionIdx", "").strip()
-            new_text = change.get("text", "").strip()
-            
-            if debug:
-                print(f"[DEBUG] Change: vttFile='{vtt_file}', captionIdx='{caption_idx_str}', text='{new_text[:50]}...'")
-
-            # Validate that we have the required VTT-specific information
-            if not vtt_file or not caption_idx_str:
-                if debug:
-                    print(f"[DEBUG] Missing VTT info, skipping change")
-                failed.append({
-                    "error": "Missing vttFile or captionIdx - HTML may be from legacy version",
-                    "change": change
-                })
-                continue
-
-            try:
-                caption_idx = int(caption_idx_str)
-            except ValueError:
-                if debug:
-                    print(f"[DEBUG] Invalid captionIdx '{caption_idx_str}', skipping")
-                failed.append({
-                    "error": f"Invalid captionIdx: {caption_idx_str}",
-                    "change": change
-                })
-                continue
-
-            # Locate the specific VTT file
-            vtt_path = vtt_dir / vtt_file
-            if not vtt_path.exists():
-                if debug:
-                    print(f"[DEBUG] VTT file not found: {vtt_path}")
-                failed.append({
-                    "error": f"VTT file not found: {vtt_file}",
-                    "change": change
-                })
-                continue
-
-            try:
-                # Load the VTT file
-                captions = webvtt.read(str(vtt_path))
-                
-                # Validate caption index
-                if caption_idx < 0 or caption_idx >= len(captions):
-                    if debug:
-                        print(f"[DEBUG] Caption index {caption_idx} out of range (0-{len(captions)-1})")
-                    failed.append({
-                        "error": f"Caption index {caption_idx} out of range (0-{len(captions)-1})",
-                        "change": change
-                    })
-                    continue
-
-                # Update the specific caption
-                old_text = captions[caption_idx].text.strip()
-                if old_text != new_text:
-                    captions[caption_idx].text = new_text
-                    captions.save(str(vtt_path))
-                    modified_files.add(vtt_path)
-                    if debug:
-                        print(f"[DEBUG] Updated {vtt_file}[{caption_idx}]: '{old_text}' -> '{new_text}'")
-                else:
-                    if debug:
-                        print(f"[DEBUG] No change needed for {vtt_file}[{caption_idx}]")
-
-                applied += 1
-
-            except Exception as e:
-                if debug:
-                    print(f"[DEBUG] Error processing {vtt_file}: {e}")
-                failed.append({
-                    "error": f"Error processing {vtt_file}: {str(e)}",
-                    "change": change
-                })
-
-        result = {
-            "success": True,
-            "message": f"Applied {applied}/{len(changes)} changes to {len(modified_files)} VTT files"
-        }
-        
-        if failed:
-            result["failed"] = failed
-            if debug:
-                print(f"[DEBUG] {len(failed)} changes failed")
-
-        return result
-
-    except Exception as e:
+      try:
+        caption_idx = int(caption_idx_str)
+      except ValueError:
         if debug:
-            print(f"[DEBUG] Unexpected error: {e}")
-        return {"success": False, "error": str(e)}
+          print(f"[DEBUG] Invalid captionIdx '{caption_idx_str}', skipping")
+        failed.append({"error": f"Invalid captionIdx: {caption_idx_str}", "change": change})
+        continue
+
+      # Locate the specific VTT file
+      vtt_path = vtt_dir / vtt_file
+      if not vtt_path.exists():
+        if debug:
+          print(f"[DEBUG] VTT file not found: {vtt_path}")
+        failed.append({"error": f"VTT file not found: {vtt_file}", "change": change})
+        continue
+
+      try:
+        # Load the VTT file
+        captions = webvtt.read(str(vtt_path))
+
+        # Validate caption index
+        if caption_idx < 0 or caption_idx >= len(captions):
+          if debug:
+            print(f"[DEBUG] Caption index {caption_idx} out of range (0-{len(captions)-1})")
+          failed.append({
+              "error": f"Caption index {caption_idx} out of range (0-{len(captions)-1})",
+              "change": change
+          })
+          continue
+
+        # Update the specific caption
+        old_text = captions[caption_idx].text.strip()
+        if old_text != new_text:
+          captions[caption_idx].text = new_text
+          captions.save(str(vtt_path))
+          modified_files.add(vtt_path)
+          if debug:
+            print(f"[DEBUG] Updated {vtt_file}[{caption_idx}]: '{old_text}' -> '{new_text}'")
+        else:
+          if debug:
+            print(f"[DEBUG] No change needed for {vtt_file}[{caption_idx}]")
+
+        applied += 1
+
+      except Exception as e:
+        if debug:
+          print(f"[DEBUG] Error processing {vtt_file}: {e}")
+        failed.append({"error": f"Error processing {vtt_file}: {str(e)}", "change": change})
+
+    result = {
+        "success": True,
+        "message": f"Applied {applied}/{len(changes)} changes to {len(modified_files)} VTT files"
+    }
+
+    if failed:
+      result["failed"] = failed
+      if debug:
+        print(f"[DEBUG] {len(failed)} changes failed")
+
+    return result
+
+  except Exception as e:
+    if debug:
+      print(f"[DEBUG] Unexpected error: {e}")
+    return {"success": False, "error": str(e)}
 
 
 @app.post("/update-speakers")
@@ -1595,19 +1580,18 @@ async def update_speakers(request: Request):
 
     vtt_dir = TRANSCRIPTION_DIR / basename
     config_candidates = [
-      vtt_dir / f"{basename}-speakers.json",
-      TRANSCRIPTION_DIR / f"{basename}-speakers.json",
+        vtt_dir / f"{basename}-speakers.json",
+        TRANSCRIPTION_DIR / f"{basename}-speakers.json",
     ]
 
     # Try to load existing config
-    existing_config_path: Optional[Path] = None
-    existing_config: Optional[dict] = None
+    # existing_config_path: Optional[Path] = None
     for cand in config_candidates:
       if cand.exists():
         try:
           with open(cand, "r", encoding="utf-8") as f:
             existing_config = json.load(f)
-          existing_config_path = cand
+            # existing_config_path = cand
           break
         except Exception as e:
           return {"success": False, "message": f"Could not read speaker config {cand}: {e}"}
@@ -1618,29 +1602,35 @@ async def update_speakers(request: Request):
       for speaker_id, info in existing_config.items():
         if isinstance(info, dict):
           speakers_by_id[speaker_id] = {
-            "name": info.get("name", speaker_id),
-            "bgcolor": info.get("bgcolor", "lightgray"),
-            "textcolor": info.get("textcolor", "darkorange"),
+              "name": info.get("name", speaker_id),
+              "bgcolor": info.get("bgcolor", "lightgray"),
+              "textcolor": info.get("textcolor", "darkorange"),
           }
         else:
           speakers_by_id[speaker_id] = {
-            "name": str(info),
-            "bgcolor": "lightgray",
-            "textcolor": "darkorange",
+              "name": str(info),
+              "bgcolor": "lightgray",
+              "textcolor": "darkorange",
           }
     else:
       # No config yet: initialize from VTT files if present
       if vtt_dir.exists():
-        vtt_ids = sorted([p.stem for p in vtt_dir.glob("*.vtt") if p.stem.isdigit()], key=lambda x: int(x))
+        vtt_ids = sorted([p.stem for p in vtt_dir.glob("*.vtt") if p.stem.isdigit()],
+                         key=lambda x: int(x))
         if vtt_ids:
-          # Map provided new names onto track ids in order; if mapping fewer, reuse last; if more, ignore extras
+          # Map provided new names onto track ids in order; if mapping fewer, 
+          # reuse last; if more, ignore extras
           new_names = list(speakers_mapping.values())
           for i, sid in enumerate(vtt_ids):
             name = new_names[i] if i < len(new_names) else f"Speaker {int(sid)+1}"
             speakers_by_id[sid] = {"name": name, "bgcolor": "lightgray", "textcolor": "darkorange"}
       # As a fallback, create a single default if nothing detected
       if not speakers_by_id:
-        speakers_by_id["0"] = {"name": next(iter(speakers_mapping.values())), "bgcolor": "lightgray", "textcolor": "darkorange"}
+        speakers_by_id["0"] = {
+            "name": next(iter(speakers_mapping.values())),
+            "bgcolor": "lightgray",
+            "textcolor": "darkorange"
+        }
 
     # Apply mapping: rename by matching current names to keys in provided mapping
     for sid, info in speakers_by_id.items():
@@ -1649,7 +1639,8 @@ async def update_speakers(request: Request):
         info["name"] = speakers_mapping[current]
 
     # Choose config path: prefer per-video directory
-    config_path = (vtt_dir / f"{basename}-speakers.json") if vtt_dir.exists() else (TRANSCRIPTION_DIR / f"{basename}-speakers.json")
+    config_path = (vtt_dir / f"{basename}-speakers.json") if vtt_dir.exists() else (
+        TRANSCRIPTION_DIR / f"{basename}-speakers.json")
     try:
       with open(config_path, "w", encoding="utf-8") as f:
         json.dump(speakers_by_id, f, indent=2)
@@ -1663,45 +1654,46 @@ async def update_speakers(request: Request):
 
 @app.post("/api/save-transcript/{basename}")
 async def save_transcript_edits(basename: str, request: Request):
-    """Save edited transcript data back to VTT files and regenerate HTML/DOCX"""
-    try:
-        data = await request.json()
-        segments = data.get("segments", [])
+  """Save edited transcript data back to VTT files and regenerate HTML/DOCX"""
+  try:
+    data = await request.json()
+    segments = data.get("segments", [])
 
-        # Group by speaker
-        speaker_segments: Dict[str, List[dict]] = {}
-        for seg in segments:
-            speaker_segments.setdefault(seg.get("speaker", "Unknown"), []).append(seg)
+    # Group by speaker
+    speaker_segments: Dict[str, List[dict]] = {}
+    for seg in segments:
+      speaker_segments.setdefault(seg.get("speaker", "Unknown"), []).append(seg)
 
-        vtt_dir = TRANSCRIPTION_DIR / basename
-        vtt_dir.mkdir(exist_ok=True)
+    vtt_dir = TRANSCRIPTION_DIR / basename
+    vtt_dir.mkdir(exist_ok=True)
 
-        for old_vtt in vtt_dir.glob("*.vtt"):
-            old_vtt.unlink()
+    for old_vtt in vtt_dir.glob("*.vtt"):
+      old_vtt.unlink()
 
-        for speaker_idx, (_, speaker_segs) in enumerate(speaker_segments.items()):
-            vtt_file = vtt_dir / f"{speaker_idx}.vtt"
-            with open(vtt_file, 'w', encoding='utf-8') as f:
-                f.write("WEBVTT\n\n")
-                for seg in speaker_segs:
-                    f.write(f"{seg['start_time']} --> {seg['end_time']}\n")
-                    f.write(f"{seg['text']}\n\n")
+    for speaker_idx, (_, speaker_segs) in enumerate(speaker_segments.items()):
+      vtt_file = vtt_dir / f"{speaker_idx}.vtt"
+      with open(vtt_file, 'w', encoding='utf-8') as f:
+        f.write("WEBVTT\n\n")
+        for seg in speaker_segs:
+          f.write(f"{seg['start_time']} --> {seg['end_time']}\n")
+          f.write(f"{seg['text']}\n\n")
 
-        return {"success": True, "message": "Transcript saved successfully"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    return {"success": True, "message": "Transcript saved successfully"}
+  except Exception as e:
+    return {"success": False, "error": str(e)}
+
 
 def main() -> None:
-    """Run the MercuryScribe web server via uvicorn."""
-    import uvicorn
-    
-    # Set web server mode to enable graceful startup without token
-    os.environ["WEB_SERVER_MODE"] = "1"
+  """Run the MercuryScribe web server via uvicorn."""
+  import uvicorn
 
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "5001"))
-    uvicorn.run(app, host=host, port=port, reload=False)
+  # Set web server mode to enable graceful startup without token
+  os.environ["WEB_SERVER_MODE"] = "1"
+
+  host = os.getenv("HOST", "0.0.0.0")
+  port = int(os.getenv("PORT", "5001"))
+  uvicorn.run(app, host=host, port=port, reload=False)
 
 
 if __name__ == "__main__":
-    main()
+  main()

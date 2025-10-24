@@ -1,11 +1,12 @@
-import os
-import shutil
-import sys
-from pathlib import Path
-import subprocess
-import zipfile
-import re
 import html as html_module
+import os
+import re
+import shutil
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

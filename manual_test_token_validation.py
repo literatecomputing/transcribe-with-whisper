@@ -5,7 +5,6 @@ This helps test model access validation without needing to "un-accept" models.
 """
 
 import requests
-import json
 
 # Test different token scenarios
 test_scenarios = [
@@ -64,7 +63,7 @@ def test_token_validation(base_url="http://localhost:5001"):
             actual_success = result.get('success', False)
             
             if success_expected == actual_success:
-                print(f"   Status: ✅ PASS")
+                print("   Status: ✅ PASS")
             else:
                 print(f"   Status: ❌ FAIL (expected success={success_expected}, got={actual_success})")
             
@@ -80,7 +79,7 @@ def test_token_validation(base_url="http://localhost:5001"):
 
 def test_with_real_token(token, base_url="http://localhost:5001"):
     """Test with a real token to see detailed model access info"""
-    print(f"\n🔍 Testing Real Token")
+    print("\n🔍 Testing Real Token")
     print("=" * 30)
     
     try:
@@ -133,9 +132,9 @@ if __name__ == "__main__":
     if real_token:
         test_with_real_token(real_token)
     else:
-        print(f"\n💡 To test with your real token:")
-        print(f"   export HUGGING_FACE_AUTH_TOKEN=your_token_here")
+        print("\n💡 To test with your real token:")
+        print("   export HUGGING_FACE_AUTH_TOKEN=your_token_here")
         print(f"   python3 {__file__}")
     
-    print(f"\n🌐 You can also test manually at:")
-    print(f"   http://localhost:5001/setup")
+    print("\n🌐 You can also test manually at:")
+    print("   http://localhost:5001/setup")

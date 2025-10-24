@@ -10,14 +10,12 @@ This script is intended to be bundled with PyInstaller (onedir).
 from __future__ import annotations
 
 import os
+import os as _os
+import sys
 import time
+import traceback
 import webbrowser
 from pathlib import Path
-import sys
-import io
-import importlib
-import traceback
-import os as _os
 
 # Configure text IO to UTF-8 as early as possible at module import time.
 # Prefer setting PYTHONIOENCODING and avoid rewrapping sys.stdout/stderr here,
@@ -128,8 +126,8 @@ def _insert_pyannote_telemetry_stub():
     This must run early (including CLI mode) to avoid import-time IO inside frozen bundles.
     """
     try:
-        import types
         import sys as _sys
+        import types
         telemetry_mod_name = "pyannote.audio.telemetry"
         telemetry_metrics_name = "pyannote.audio.telemetry.metrics"
         if telemetry_mod_name not in _sys.modules:
@@ -268,11 +266,12 @@ def main():
             pass
 
         # Ensure the package is importable
-        import transcribe_with_whisper.server_app as server_app
+        import traceback
 
         # Run the app via uvicorn programmatically
         import uvicorn
-        import traceback
+
+        import transcribe_with_whisper.server_app as server_app
 
         host = os.getenv("HOST", "127.0.0.1")
         port = int(os.getenv("PORT", "5001"))

@@ -5,8 +5,9 @@ they get included in frozen builds. We filter data file sources to existing
 paths to avoid causing Analysis-time failures on environments with different
 site-packages layouts.
 """
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 from pathlib import Path
+
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 hiddenimports = []
 datas = []
@@ -27,7 +28,7 @@ except Exception:
     # If collecting datas fails, leave datas empty; it's better to ship code
     # modules than to fail the build due to missing local paths.
     datas = []
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 hiddenimports = collect_submodules('pyannote.audio')
 datas = collect_data_files('pyannote.audio')

@@ -1,8 +1,5 @@
 import os
 from pathlib import Path
-import tempfile
-
-import pytest
 
 from transcribe_with_whisper import server_app
 

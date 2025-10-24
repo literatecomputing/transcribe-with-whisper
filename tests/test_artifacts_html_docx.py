@@ -1,7 +1,7 @@
 import os
 import re
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 os.environ.setdefault("SKIP_PREFLIGHT_CHECKS", "1")
 os.environ.setdefault("SKIP_HF_STARTUP_CHECK", "1")

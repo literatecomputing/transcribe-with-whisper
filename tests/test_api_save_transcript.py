@@ -2,9 +2,8 @@ import os
 import sys
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-import pytest
 import webvtt
+from fastapi.testclient import TestClient
 
 
 def make_app_with_temp_dir(tmpdir: Path):

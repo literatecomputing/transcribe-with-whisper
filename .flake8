@@ -1,0 +1,6 @@
+ru[flake8]
+max-line-length = 100
+# Ignore indentation errors because this repository historically uses 2-space indents.
+# We still keep flake8 strict about runtime errors (F codes) so those must be fixed.
+extend-ignore = E203, W503, E111, E114, E101
+exclude = .git,__pycache__,build,dist,packaging,venv,.venv,artifacts
