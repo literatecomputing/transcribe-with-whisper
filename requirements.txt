@@ -23,7 +23,7 @@ asteroid-filterbanks
 
 # HTML -> DOCX conversion (pure-Python)
 python-docx>=0.8.12
-htmldocx>=0.0.14
+htmldocx
 
 # Notes:
 # - Build the Windows bundle on Windows with these installed in the build venv so
