@@ -47,3 +47,9 @@ jobs:
           (github.event_name == 'release' && github.event.action == 'published') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # If a package file with the same filename+hash already exists on PyPI,
+          # don't fail the workflow. This avoids a hard failure when a tag push
+          # and a release publish both trigger the publish step for the same
+          # distribution.
+          skip-existing: true
