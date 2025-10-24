@@ -44,10 +44,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Install the built wheel into the runner environment to ensure it
-          # installs and the package can be imported. Use --no-deps to avoid
-          # installing heavy runtime deps in this smoke check.
+          # installs. Use --no-deps so we don't pull heavy runtime deps.
           pip install dist/*.whl --no-deps
-          python -c "import importlib; m = importlib.import_module('transcribe_with_whisper.main'); print(m.get_package_version())"
+          # Read the installed distribution version from metadata instead of
+          # importing package code (which would pull heavy deps like pyannote).
+          python -c "import importlib.metadata as md; print(md.version('transcribe-with-whisper'))"
 
       - name: Check PyPI for existing version
         id: check_pypi
