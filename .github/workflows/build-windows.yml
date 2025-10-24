@@ -99,20 +99,13 @@ jobs:
           Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs"
           & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs
 
-      - name: Upload dist for release/tag
+      - name: Upload Windows bundle to GitHub Release
         if: |
           (github.event_name == 'release' && github.event.action == 'published') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-release-asset@v1
         with:
-          name: MercuryScribe-dist
-          path: dist/MercuryScribe
-
-      - name: Upload built artifact
-        if: |
-          (github.event_name == 'release' && github.event.action == 'published') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
-        uses: actions/upload-artifact@v4
-        with:
-          name: MercuryScribe-windows-x86_64
-          path: MercuryScribe-windows-x86_64.zip
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: MercuryScribe-windows-x86_64.zip
+          asset_name: MercuryScribe-windows-x86_64.zip
+          asset_content_type: application/zip

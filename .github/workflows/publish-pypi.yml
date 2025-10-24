@@ -80,3 +80,26 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+      - name: Add canonical distribution links to Release notes
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const releaseId = context.payload.release.id;
+            const pypiUrl = 'https://pypi.org/project/transcribe-with-whisper/';
+            const dockerWeb = `ghcr.io/${owner}/${repo}-web`;
+            const dockerCli = `ghcr.io/${owner}/${repo}-cli`;
+            const windowsAsset = 'MercuryScribe-windows-x86_64.zip';
+
+            const { data: release } = await github.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+            let body = release.body || '';
+            if (!body.includes(pypiUrl)) {
+              const note = `\n\n### Distribution\n- PyPI: ${pypiUrl}\n- Windows bundle: attached to this release as \`${windowsAsset}\` (see Assets)\n- Docker images: \`${dockerWeb}:latest\`, \`${dockerCli}:latest\` (also available as SHA-tagged images)\n\nYou can install the Python package with `pip install transcribe-with-whisper`.\n`;
+              body = body + note;
+              await github.rest.repos.updateRelease({ owner, repo, release_id: releaseId, body });
+            } else {
+              core.info('Release body already contains PyPI link; skipping update.');
+            }
