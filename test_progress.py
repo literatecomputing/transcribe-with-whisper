@@ -6,7 +6,6 @@ Test script to verify progress monitoring works correctly
 import os
 import sys
 import time
-import threading
 from pathlib import Path
 
 # Add the project directory to Python path
@@ -18,6 +17,7 @@ os.environ['SKIP_HF_STARTUP_CHECK'] = '1'
 
 # Import our server module
 import transcribe_with_whisper.server_app as server_app
+
 
 def test_progress_monitoring():
     """Test our progress monitoring on a real transcription"""

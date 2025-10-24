@@ -13,6 +13,7 @@ Exit codes:
 """
 
 from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -32,7 +33,8 @@ def main(argv: list[str]) -> int:
     try:
         # Import the shared converter. This will raise ImportError if python-docx
         # (or the shared module) is not available, which we treat as a deps error.
-        from transcribe_with_whisper.html_to_docx import ensure_deps, convert_html_file_to_docx
+        from transcribe_with_whisper.html_to_docx import (
+          convert_html_file_to_docx, ensure_deps)
     except Exception as e:  # broad except to catch ImportError and other import-time failures
         print("Error: missing Python dependencies. Install with: pip install python-docx", file=sys.stderr)
         print(f"(import error: {e})", file=sys.stderr)

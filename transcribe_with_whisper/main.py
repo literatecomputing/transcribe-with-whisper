@@ -1,43 +1,46 @@
-import sys
-import os
-import subprocess
 import argparse
-import platform
-import importlib
 import base64
-import textwrap
-import shlex
 import html as html_module
+import importlib
+import os
+import platform
+import re
+import shlex
+import subprocess
+import sys
+import warnings
 from functools import lru_cache
 from pathlib import Path
-import re
-import warnings
+
 from transcribe_with_whisper import ensure_preflight
 
 ensure_preflight()
 
+import webvtt
+from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
 from pydub import AudioSegment
-from faster_whisper import WhisperModel
-import webvtt
+
 try:
-    from importlib.metadata import PackageNotFoundError, version as pkg_version
+  from importlib.metadata import PackageNotFoundError
+  from importlib.metadata import version as pkg_version
 except ImportError:  # pragma: no cover - fallback for Python <3.8
-    from importlib_metadata import PackageNotFoundError, version as pkg_version  # type: ignore
+  from importlib_metadata import PackageNotFoundError
+  from importlib_metadata import version as pkg_version  # type: ignore
 try:
-    import torchaudio  # type: ignore
-    _HAS_TORCHAUDIO = True
+  import torchaudio  # type: ignore
+  _HAS_TORCHAUDIO = True
 except Exception:
-    _HAS_TORCHAUDIO = False
+  _HAS_TORCHAUDIO = False
 
 # Check pyannote.audio version for API compatibility
 try:
-    import pyannote.audio
-    _PYANNOTE_VERSION = pyannote.audio.__version__
-    _PYANNOTE_MAJOR = int(_PYANNOTE_VERSION.split('.')[0])
+  import pyannote.audio
+  _PYANNOTE_VERSION = pyannote.audio.__version__
+  _PYANNOTE_MAJOR = int(_PYANNOTE_VERSION.split('.')[0])
 except Exception:
-    # Fallback: assume version 4.x if import fails
-    _PYANNOTE_MAJOR = 4
+  # Fallback: assume version 4.x if import fails
+  _PYANNOTE_MAJOR = 4
 
 warnings.filterwarnings("ignore", message="Model was trained with")
 warnings.filterwarnings("ignore", message="Lightning automatically upgraded")
@@ -47,91 +50,92 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio._back
 
 @lru_cache(maxsize=1)
 def _find_bundled_ffmpeg() -> str | None:
-    """Find the bundled ffmpeg executable if running from a PyInstaller bundle."""
-    if not getattr(sys, 'frozen', False):
-        return None
-    
-    exe_dir = Path(sys.executable).resolve().parent
-    internal_dir = exe_dir / "_internal"
-    
-    # Check common locations for bundled ffmpeg
-    candidates = [
-        exe_dir / "ffmpeg.exe",  # Windows
-        exe_dir / "ffmpeg",      # Linux/macOS
-        internal_dir / "ffmpeg.exe",
-        internal_dir / "ffmpeg",
-    ]
-    
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_file():
-            return str(candidate)
-    
+  """Find the bundled ffmpeg executable if running from a PyInstaller bundle."""
+  if not getattr(sys, 'frozen', False):
     return None
+
+  exe_dir = Path(sys.executable).resolve().parent
+  internal_dir = exe_dir / "_internal"
+
+  # Check common locations for bundled ffmpeg
+  candidates = [
+      exe_dir / "ffmpeg.exe",  # Windows
+      exe_dir / "ffmpeg",  # Linux/macOS
+      internal_dir / "ffmpeg.exe",
+      internal_dir / "ffmpeg",
+  ]
+
+  for candidate in candidates:
+    if candidate.exists() and candidate.is_file():
+      return str(candidate)
+
+  return None
 
 
 @lru_cache(maxsize=1)
 def _get_embedded_favicon_data_uri() -> str | None:
-    """Return the data URI for the bundled square logo favicon."""
-    logo_path = Path(__file__).resolve().parent.parent / "branding" / "transcribe-with-whisper-logo-square.svg"
-    if not logo_path.exists():
-        return None
+  """Return the data URI for the bundled square logo favicon."""
+  logo_path = Path(
+      __file__).resolve().parent.parent / "branding" / "transcribe-with-whisper-logo-square.svg"
+  if not logo_path.exists():
+    return None
 
-    try:
-        svg_bytes = logo_path.read_bytes()
-    except OSError as exc:
-        print(f"⚠️ Unable to read favicon asset: {exc}")
-        return None
+  try:
+    svg_bytes = logo_path.read_bytes()
+  except OSError as exc:
+    print(f"⚠️ Unable to read favicon asset: {exc}")
+    return None
 
-    encoded = base64.b64encode(svg_bytes).decode("ascii")
-    return f"data:image/svg+xml;base64,{encoded}"
+  encoded = base64.b64encode(svg_bytes).decode("ascii")
+  return f"data:image/svg+xml;base64,{encoded}"
 
 
 def is_apple_silicon() -> bool:
-    """Return True when running on an Apple Silicon Mac."""
-    return platform.system() == "Darwin" and platform.machine().lower() in {"arm64", "aarch64"}
+  """Return True when running on an Apple Silicon Mac."""
+  return platform.system() == "Darwin" and platform.machine().lower() in {"arm64", "aarch64"}
 
 
 def _torch_mps_available() -> bool:
-    """Detect whether PyTorch Metal (MPS) backend is available."""
-    try:
-        import torch  # type: ignore
+  """Detect whether PyTorch Metal (MPS) backend is available."""
+  try:
+    import torch  # type: ignore
 
-        mps_backend = getattr(torch.backends, "mps", None)
-        if mps_backend is None:
-            return False
-        return bool(getattr(mps_backend, "is_available", lambda: False)())
-    except Exception:
-        return False
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is None:
+      return False
+    return bool(getattr(mps_backend, "is_available", lambda: False)())
+  except Exception:
+    return False
 
 
 def _maybe_move_pipeline_to_mps(pipeline) -> bool:
-    """Attempt to move a pyannote Pipeline to the MPS device if available."""
-    if not is_apple_silicon() or not _torch_mps_available():
-        return False
+  """Attempt to move a pyannote Pipeline to the MPS device if available."""
+  if not is_apple_silicon() or not _torch_mps_available():
+    return False
 
-    try:
-        import torch  # type: ignore
+  try:
+    import torch  # type: ignore
 
-        pipeline.to(torch.device("mps"))
-        print("⚡️ Using Apple Metal (MPS) acceleration for diarization.")
-        return True
-    except AttributeError:
-        # Pipeline does not expose .to(); ignore silently
-        return False
-    except Exception as exc:
-        print(f"⚠️ Could not enable MPS for pyannote pipeline: {exc}")
-        return False
+    pipeline.to(torch.device("mps"))
+    print("⚡️ Using Apple Metal (MPS) acceleration for diarization.")
+    return True
+  except AttributeError:
+    # Pipeline does not expose .to(); ignore silently
+    return False
+  except Exception as exc:
+    print(f"⚠️ Could not enable MPS for pyannote pipeline: {exc}")
+    return False
 
 
 def _has_coreml_extension() -> bool:
-    """Check whether the installed faster-whisper build exposes the CoreML extension."""
-    try:
-        ext_module = importlib.import_module("ctranslate2._ext")  # type: ignore[import]
-    except ModuleNotFoundError:
-        return False
-    except Exception:
-        return False
-    return hasattr(ext_module, "coreml")
+  """Check whether the installed faster-whisper build exposes the CoreML extension."""
+  try:
+    ext_module = importlib.import_module("ctranslate2._ext")  # type: ignore[import]
+  except ModuleNotFoundError:
+    return False
+  except Exception:
+    return False
+  return hasattr(ext_module, "coreml")
 
 
 def create_whisper_model(
@@ -140,238 +144,259 @@ def create_whisper_model(
     compute_type: str | None = None,
     coreml_units: str | None = None,
 ):
-    """Instantiate WhisperModel with sensible defaults and optional CoreML acceleration."""
-    requested_device = (device or "auto").lower()
-    requested_compute_type = compute_type or "auto"
-    requested_coreml_units = coreml_units.lower() if coreml_units else None
+  """Instantiate WhisperModel with sensible defaults and optional CoreML acceleration."""
+  requested_device = (device or "auto").lower()
+  requested_compute_type = compute_type or "auto"
+  requested_coreml_units = coreml_units.lower() if coreml_units else None
 
-    if requested_coreml_units and not _has_coreml_extension():
-        print(
-            "⚠️ CoreML compute units were requested but faster-whisper[coreml] isn't installed. "
-            "Install it on Apple Silicon to enable CoreML acceleration."
-        )
-        requested_coreml_units = None
+  if requested_coreml_units and not _has_coreml_extension():
+    print("⚠️ CoreML compute units were requested but faster-whisper[coreml] isn't installed. "
+          "Install it on Apple Silicon to enable CoreML acceleration.")
+    requested_coreml_units = None
 
-    model_kwargs: dict[str, str] = {}
-    attempted_coreml = False
+  model_kwargs: dict[str, str] = {}
+  attempted_coreml = False
 
-    if requested_coreml_units:
-        attempted_coreml = True
-        model_kwargs["coreml_compute_units"] = requested_coreml_units
-        if requested_device == "auto":
-            requested_device = "cpu"
-        if requested_compute_type in (None, "auto", "default"):
-            requested_compute_type = "int8"
-    elif requested_device == "auto" and is_apple_silicon() and _has_coreml_extension():
-        attempted_coreml = True
-        requested_device = "cpu"
-        if requested_compute_type in (None, "auto", "default"):
-            requested_compute_type = "int8"
-        requested_coreml_units = "all"
-        model_kwargs["coreml_compute_units"] = requested_coreml_units
-        print("🍎 Apple Silicon detected; enabling CoreML acceleration (compute_units=all).")
+  if requested_coreml_units:
+    attempted_coreml = True
+    model_kwargs["coreml_compute_units"] = requested_coreml_units
+    if requested_device == "auto":
+      requested_device = "cpu"
+    if requested_compute_type in (None, "auto", "default"):
+      requested_compute_type = "int8"
+  elif requested_device == "auto" and is_apple_silicon() and _has_coreml_extension():
+    attempted_coreml = True
+    requested_device = "cpu"
+    if requested_compute_type in (None, "auto", "default"):
+      requested_compute_type = "int8"
+    requested_coreml_units = "all"
+    model_kwargs["coreml_compute_units"] = requested_coreml_units
+    print("🍎 Apple Silicon detected; enabling CoreML acceleration (compute_units=all).")
 
-    resolved_coreml_units = model_kwargs.get("coreml_compute_units")
+  resolved_coreml_units = model_kwargs.get("coreml_compute_units")
 
-    try:
-        model = WhisperModel(
-            model_size,
-            device=requested_device,
-            compute_type=requested_compute_type,
-            **model_kwargs,
-        )
-    except Exception as exc:
-        if attempted_coreml:
-            print(
-                f"⚠️ CoreML acceleration request failed ({exc}). "
-                "Falling back to default Whisper settings."
-            )
-            model_kwargs = {}
-            resolved_coreml_units = None
-            model = WhisperModel(model_size, device=(device or "auto"), compute_type=(compute_type or "auto"))
-        else:
-            raise
+  try:
+    model = WhisperModel(
+        model_size,
+        device=requested_device,
+        compute_type=requested_compute_type,
+        **model_kwargs,
+    )
+  except Exception as exc:
+    if attempted_coreml:
+      print(f"⚠️ CoreML acceleration request failed ({exc}). "
+            "Falling back to default Whisper settings.")
+      model_kwargs = {}
+      resolved_coreml_units = None
+      model = WhisperModel(model_size,
+                           device=(device or "auto"),
+                           compute_type=(compute_type or "auto"))
+    else:
+      raise
 
-    actual_device = getattr(model.model, "device", requested_device)
-    actual_compute = getattr(model.model, "compute_type", requested_compute_type)
-    print(f"Loaded Whisper model '{model_size}' on device={actual_device} (compute_type={actual_compute})")
-    if resolved_coreml_units:
-        print(f"CoreML compute units: {resolved_coreml_units}")
+  actual_device = getattr(model.model, "device", requested_device)
+  actual_compute = getattr(model.model, "compute_type", requested_compute_type)
+  print(
+      f"Loaded Whisper model '{model_size}' on device={actual_device} (compute_type={actual_compute})"
+  )
+  if resolved_coreml_units:
+    print(f"CoreML compute units: {resolved_coreml_units}")
 
-    return model
+  return model
 
 
 def get_package_version() -> str:
-    """Return the project version from local metadata or installed package."""
-    distribution_name = "transcribe-with-whisper"
+  """Return the project version from local metadata or installed package."""
+  distribution_name = "transcribe-with-whisper"
 
-    setup_path = Path(__file__).resolve().parent.parent / "setup.py"
-    if setup_path.exists():
-        match = re.search(r"version\s*=\s*['\"]([^'\"]+)['\"]", setup_path.read_text(encoding="utf-8"))
-        if match:
-            return match.group(1)
+  setup_path = Path(__file__).resolve().parent.parent / "setup.py"
+  if setup_path.exists():
+    match = re.search(r"version\s*=\s*['\"]([^'\"]+)['\"]", setup_path.read_text(encoding="utf-8"))
+    if match:
+      return match.group(1)
 
+  try:
+    return pkg_version(distribution_name)
+  except PackageNotFoundError:
     try:
-        return pkg_version(distribution_name)
-    except PackageNotFoundError:
-        try:
-            from pkg_resources import get_distribution  # type: ignore
+      from pkg_resources import get_distribution  # type: ignore
 
-            return get_distribution(distribution_name).version
-        except Exception:
-            return "unknown"
+      return get_distribution(distribution_name).version
+    except Exception:
+      return "unknown"
+
 
 def millisec(timeStr):
-    spl = timeStr.split(":")
-    s = int((int(spl[0]) * 3600 + int(spl[1]) * 60 + float(spl[2])) * 1000)
-    return s
+  spl = timeStr.split(":")
+  s = int((int(spl[0]) * 3600 + int(spl[1]) * 60 + float(spl[2])) * 1000)
+  return s
+
 
 def format_time(seconds):
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+  hours = int(seconds // 3600)
+  minutes = int((seconds % 3600) // 60)
+  secs = seconds % 60
+  return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
 
 def convert_to_wav(inputfile, outputfile):
-    import os
-    abs_input = os.path.abspath(inputfile)
-    abs_output = os.path.abspath(outputfile)
-    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
-    log_path = os.path.join(exe_dir, "convert_to_wav.log")
-    def log(msg):
-        with open(log_path, "a", encoding="utf-8") as fh:
-            fh.write(msg + "\n")
-    log(f"[convert_to_wav] cwd: {os.getcwd()}")
-    log(f"[convert_to_wav] inputfile: {inputfile}, abs: {abs_input}, exists: {os.path.isfile(inputfile)}")
-    log(f"[convert_to_wav] outputfile: {outputfile}, abs: {abs_output}, will create: {not os.path.isfile(outputfile)}")
-    # On Windows, ffmpeg should handle both / and \\ in paths, but always use abs path for safety
-    input_arg = abs_input
-    output_arg = abs_output
-    if not os.path.isfile(outputfile):
-        ffmpeg_cmd = _find_bundled_ffmpeg() or "ffmpeg"
-        log(f"[convert_to_wav] using ffmpeg: {ffmpeg_cmd}")
-        try:
-            result = subprocess.run([ffmpeg_cmd, "-i", input_arg, output_arg])
-            log(f"[convert_to_wav] ffmpeg exited with code {result.returncode}")
-            if result.returncode != 0:
-                log(f"[convert_to_wav] ffmpeg stderr: {result.stderr}")
-        except FileNotFoundError as e:
-            log(f"[convert_to_wav] ffmpeg command not found: {e}")
-            raise
-        except Exception as e:
-            log(f"[convert_to_wav] unexpected error: {e}")
-            raise
+  import os
+  abs_input = os.path.abspath(inputfile)
+  abs_output = os.path.abspath(outputfile)
+  exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+  log_path = os.path.join(exe_dir, "convert_to_wav.log")
+
+  def log(msg):
+    with open(log_path, "a", encoding="utf-8") as fh:
+      fh.write(msg + "\n")
+
+  log(f"[convert_to_wav] cwd: {os.getcwd()}")
+  log(f"[convert_to_wav] inputfile: {inputfile}, abs: {abs_input}, exists: {os.path.isfile(inputfile)}"
+      )
+  log(f"[convert_to_wav] outputfile: {outputfile}, abs: {abs_output}, will create: {not os.path.isfile(outputfile)}"
+      )
+  # On Windows, ffmpeg should handle both / and \\ in paths, but always use abs path for safety
+  input_arg = abs_input
+  output_arg = abs_output
+  if not os.path.isfile(outputfile):
+    ffmpeg_cmd = _find_bundled_ffmpeg() or "ffmpeg"
+    log(f"[convert_to_wav] using ffmpeg: {ffmpeg_cmd}")
+    try:
+      result = subprocess.run([ffmpeg_cmd, "-i", input_arg, output_arg])
+      log(f"[convert_to_wav] ffmpeg exited with code {result.returncode}")
+      if result.returncode != 0:
+        log(f"[convert_to_wav] ffmpeg stderr: {result.stderr}")
+    except FileNotFoundError as e:
+      log(f"[convert_to_wav] ffmpeg command not found: {e}")
+      raise
+    except Exception as e:
+      log(f"[convert_to_wav] unexpected error: {e}")
+      raise
+
 
 def create_spaced_audio(inputWav, outputWav, spacer_ms=2000):
-    audio = AudioSegment.from_wav(inputWav)
-    spacer = AudioSegment.silent(duration=spacer_ms)
-    audio = spacer.append(audio, crossfade=0)
-    audio.export(outputWav, format="wav")
+  audio = AudioSegment.from_wav(inputWav)
+  spacer = AudioSegment.silent(duration=spacer_ms)
+  audio = spacer.append(audio, crossfade=0)
+  audio.export(outputWav, format="wav")
 
-def get_diarization(inputWav, diarizationFile, num_speakers=None, min_speakers=None, max_speakers=None):
-    auth_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
-    if not auth_token:
-        raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
 
-    # Use appropriate API based on pyannote.audio version
-    if _PYANNOTE_MAJOR >= 4:
-        # pyannote.audio 4.0.0+ API
-        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1", token=auth_token)
+def get_diarization(inputWav,
+                    diarizationFile,
+                    num_speakers=None,
+                    min_speakers=None,
+                    max_speakers=None):
+  auth_token = os.getenv("HUGGING_FACE_AUTH_TOKEN")
+  if not auth_token:
+    raise ValueError("HUGGING_FACE_AUTH_TOKEN environment variable is required")
+
+  # Use appropriate API based on pyannote.audio version
+  if _PYANNOTE_MAJOR >= 4:
+    # pyannote.audio 4.0.0+ API
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-community-1",
+                                        token=auth_token)
+  else:
+    # pyannote.audio 3.x API
+    pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1",
+                                        use_auth_token=auth_token)
+
+  _maybe_move_pipeline_to_mps(pipeline)
+
+  if not os.path.isfile(diarizationFile):
+    # Add progress hook to report diarization progress
+    def progress_hook(step_name=None, step_artifact=None, file=None, total=None, completed=None):
+      """Progress callback for diarization pipeline"""
+      if completed is not None and total is not None:
+        # This is chunk progress during inference
+        percent = int((completed / total) * 100) if total > 0 else 0
+        print(f"Diarization progress: processing chunk {completed}/{total} ({percent}%)",
+              flush=True)
+      elif step_name:
+        # This is step-level progress
+        print(f"Diarization progress: {step_name}", flush=True)
+
+    # Build pipeline parameters with speaker constraints
+    pipeline_params = {"hook": progress_hook}
+
+    if num_speakers is not None:
+      pipeline_params["num_speakers"] = num_speakers
+      print(f"Using specified number of speakers: {num_speakers}")
+    elif min_speakers is not None or max_speakers is not None:
+      if min_speakers is not None:
+        pipeline_params["min_speakers"] = min_speakers
+        print(f"Using minimum speakers: {min_speakers}")
+      if max_speakers is not None:
+        pipeline_params["max_speakers"] = max_speakers
+        print(f"Using maximum speakers: {max_speakers}")
+
+    if _HAS_TORCHAUDIO:
+      # Load audio into memory for faster processing
+      waveform, sample_rate = torchaudio.load(inputWav)
+      dz = pipeline({"waveform": waveform, "sample_rate": sample_rate}, **pipeline_params)
     else:
-        # pyannote.audio 3.x API
-        pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=auth_token)
+      # Fallback to file path if torchaudio is not available
+      dz = pipeline({"uri": "blabla", "audio": inputWav}, **pipeline_params)
+    # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
+    diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
+    with open(diarizationFile, "w") as f:
+      f.write(str(diarization))
+  with open(diarizationFile) as f:
+    return f.read().splitlines()
 
-    _maybe_move_pipeline_to_mps(pipeline)
-
-    if not os.path.isfile(diarizationFile):
-        # Add progress hook to report diarization progress
-        def progress_hook(step_name=None, step_artifact=None, file=None, total=None, completed=None):
-            """Progress callback for diarization pipeline"""
-            if completed is not None and total is not None:
-                # This is chunk progress during inference
-                percent = int((completed / total) * 100) if total > 0 else 0
-                print(f"Diarization progress: processing chunk {completed}/{total} ({percent}%)", flush=True)
-            elif step_name:
-                # This is step-level progress
-                print(f"Diarization progress: {step_name}", flush=True)
-        
-        # Build pipeline parameters with speaker constraints
-        pipeline_params = {"hook": progress_hook}
-        
-        if num_speakers is not None:
-            pipeline_params["num_speakers"] = num_speakers
-            print(f"Using specified number of speakers: {num_speakers}")
-        elif min_speakers is not None or max_speakers is not None:
-            if min_speakers is not None:
-                pipeline_params["min_speakers"] = min_speakers
-                print(f"Using minimum speakers: {min_speakers}")
-            if max_speakers is not None:
-                pipeline_params["max_speakers"] = max_speakers
-                print(f"Using maximum speakers: {max_speakers}")
-        
-        if _HAS_TORCHAUDIO:
-            # Load audio into memory for faster processing
-            waveform, sample_rate = torchaudio.load(inputWav)
-            dz = pipeline({"waveform": waveform, "sample_rate": sample_rate}, **pipeline_params)
-        else:
-            # Fallback to file path if torchaudio is not available
-            dz = pipeline({"uri": "blabla", "audio": inputWav}, **pipeline_params)
-        # In pyannote.audio 4.0, pipeline returns an object with .speaker_diarization attribute
-        diarization = dz.speaker_diarization if hasattr(dz, 'speaker_diarization') else dz
-        with open(diarizationFile, "w") as f:
-            f.write(str(diarization))
-    with open(diarizationFile) as f:
-        return f.read().splitlines()
 
 def group_segments(dzs):
-    groups, g, lastend = [], [], 0
-    for d in dzs:
-        if g and g[0].split()[-1] != d.split()[-1]:
-            groups.append(g)
-            g = []
-        g.append(d)
-        end = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", d)[1])
-        if lastend > end:
-            groups.append(g)
-            g = []
-        else:
-            lastend = end
-    if g:
-        groups.append(g)
-    return groups
+  groups, g, lastend = [], [], 0
+  for d in dzs:
+    if g and g[0].split()[-1] != d.split()[-1]:
+      groups.append(g)
+      g = []
+    g.append(d)
+    end = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", d)[1])
+    if lastend > end:
+      groups.append(g)
+      g = []
+    else:
+      lastend = end
+  if g:
+    groups.append(g)
+  return groups
+
 
 def export_segments_audio(groups, inputWav, spacermilli=2000):
-    audio = AudioSegment.from_wav(inputWav)
-    segment_files = []
-    for idx, g in enumerate(groups):
-        start = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
-        end = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[-1])[1])
-        audio[start:end].export(f"{idx}.wav", format="wav")
-        segment_files.append(f"{idx}.wav")
-    return segment_files
+  audio = AudioSegment.from_wav(inputWav)
+  segment_files = []
+  for idx, g in enumerate(groups):
+    start = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
+    end = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[-1])[1])
+    audio[start:end].export(f"{idx}.wav", format="wav")
+    segment_files.append(f"{idx}.wav")
+  return segment_files
 
-def transcribe_segments(
-    segment_files,
-    model_size="base",
-    device="auto",
-    compute_type="auto",
-    coreml_units=None,
-    speaker_header=False,
-    speaker_inline=True
-):
-    model = create_whisper_model(model_size, device=device, compute_type=compute_type, coreml_units=coreml_units)
-    total_segments = len(segment_files)
-    for idx, f in enumerate(segment_files, start=1):
-        vtt_file = f"{Path(f).stem}.vtt"
-        if not os.path.isfile(vtt_file):
-            print(f"Transcribing segment {idx}/{total_segments}: {f}", flush=True)
-            segments, _ = model.transcribe(f, language="en")
-            with open(vtt_file, "w", encoding="utf-8") as out:
-                out.write("WEBVTT\n\n")
-                for s in segments:
-                    out.write(f"{format_time(s.start)} --> {format_time(s.end)}\n{s.text.strip()}\n\n")
-            print(f"Completed segment {idx}/{total_segments}", flush=True)
-    return [f"{Path(f).stem}.vtt" for f in segment_files]
+
+def transcribe_segments(segment_files,
+                        model_size="base",
+                        device="auto",
+                        compute_type="auto",
+                        coreml_units=None,
+                        speaker_header=False,
+                        speaker_inline=True):
+  model = create_whisper_model(model_size,
+                               device=device,
+                               compute_type=compute_type,
+                               coreml_units=coreml_units)
+  total_segments = len(segment_files)
+  for idx, f in enumerate(segment_files, start=1):
+    vtt_file = f"{Path(f).stem}.vtt"
+    if not os.path.isfile(vtt_file):
+      print(f"Transcribing segment {idx}/{total_segments}: {f}", flush=True)
+      segments, _ = model.transcribe(f, language="en")
+      with open(vtt_file, "w", encoding="utf-8") as out:
+        out.write("WEBVTT\n\n")
+        for s in segments:
+          out.write(f"{format_time(s.start)} --> {format_time(s.end)}\n{s.text.strip()}\n\n")
+      print(f"Completed segment {idx}/{total_segments}", flush=True)
+  return [f"{Path(f).stem}.vtt" for f in segment_files]
+
 
 def generate_html(
     outputHtml,
@@ -386,31 +411,31 @@ def generate_html(
     called_by_mercuryweb=False,
     mercury_command: str | None = None,
 ):
-    # video_title is inputfile with no extension
-    video_title = os.path.splitext(inputfile)[0]
-    html = []
-    favicon_href = _get_embedded_favicon_data_uri()
-    favicon_tag = f"\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon_href}\">" if favicon_href else ""
-    generator_source = "mercuryweb" if called_by_mercuryweb else "transcribe-with-whisper"
-    generator_meta_tag = f"\n    <meta name=\"generator\" content=\"{generator_source} {get_package_version()}\">"
-    command_meta_tag = ""
-    section_meta_tag = f"\n    <meta name=\"speaker-section\" content=\"{'true' if speaker_section else 'false'}\">"
-    inline_meta_tag = f"\n    <meta name=\"speaker-inline\" content=\"{'true' if speaker_inline else 'false'}\">"
-    speaker_meta_tags = ""
-    for speaker_id, (speaker_name, bg_color, text_color) in sorted(speakers.items(), key=lambda item: str(item[0])):
-        escaped_id = html_module.escape(str(speaker_id), quote=True)
-        escaped_name = html_module.escape(speaker_name, quote=True)
-        escaped_bg = html_module.escape(bg_color, quote=True)
-        escaped_fg = html_module.escape(text_color, quote=True)
-        speaker_meta_tags += (
-            f"\n    <meta name=\"speaker\" data-id=\"{escaped_id}\" "
-            f"data-bg=\"{escaped_bg}\" data-fg=\"{escaped_fg}\" content=\"{escaped_name}\">"
-        )
-    if mercury_command:
-        escaped_command = html_module.escape(mercury_command, quote=True)
-        command_meta_tag = f"\n    <meta name=\"mercuryscribe-command\" content=\"{escaped_command}\">"
+  # video_title is inputfile with no extension
+  video_title = os.path.splitext(inputfile)[0]
+  html = []
+  favicon_href = _get_embedded_favicon_data_uri()
+  favicon_tag = f"\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"{favicon_href}\">" if favicon_href else ""
+  generator_source = "mercuryweb" if called_by_mercuryweb else "transcribe-with-whisper"
+  generator_meta_tag = f"\n    <meta name=\"generator\" content=\"{generator_source} {get_package_version()}\">"
+  command_meta_tag = ""
+  section_meta_tag = f"\n    <meta name=\"speaker-section\" content=\"{'true' if speaker_section else 'false'}\">"
+  inline_meta_tag = f"\n    <meta name=\"speaker-inline\" content=\"{'true' if speaker_inline else 'false'}\">"
+  speaker_meta_tags = ""
+  for speaker_id, (speaker_name, bg_color, text_color) in sorted(speakers.items(),
+                                                                 key=lambda item: str(item[0])):
+    escaped_id = html_module.escape(str(speaker_id), quote=True)
+    escaped_name = html_module.escape(speaker_name, quote=True)
+    escaped_bg = html_module.escape(bg_color, quote=True)
+    escaped_fg = html_module.escape(text_color, quote=True)
+    speaker_meta_tags += (
+        f"\n    <meta name=\"speaker\" data-id=\"{escaped_id}\" "
+        f"data-bg=\"{escaped_bg}\" data-fg=\"{escaped_fg}\" content=\"{escaped_name}\">")
+  if mercury_command:
+    escaped_command = html_module.escape(mercury_command, quote=True)
+    command_meta_tag = f"\n    <meta name=\"mercuryscribe-command\" content=\"{escaped_command}\">"
 
-    preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}{command_meta_tag}{section_meta_tag}{inline_meta_tag}{speaker_meta_tags}\n    <style>
+  preS = f"""<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n    <title>{inputfile}</title>{favicon_tag}{generator_meta_tag}{command_meta_tag}{section_meta_tag}{inline_meta_tag}{speaker_meta_tags}\n    <style>
         body {{
             font-family: sans-serif;
             font-size: 18px;
@@ -613,60 +638,63 @@ def generate_html(
     <div id="content">
   <div class="e" style="background-color: white">
   """
-    html.append(preS)
-    def_boxclr, def_spkrclr = "white", "orange"
+  html.append(preS)
+  def_boxclr, def_spkrclr = "white", "orange"
 
-    for idx, g in enumerate(groups):
-        # Use the actual start time of the diarization segment, not offset by spacermilli
-        shift = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
-        spacer_offset_sec = spacermilli / 1000.0
-        speaker = g[0].split()[-1]
-        spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
-        escaped_speaker_id = html_module.escape(speaker, quote=True)
-        escaped_speaker_name = html_module.escape(spkr_name, quote=True)
-        html.append(
-            f'    <div class="e" data-speaker-id="{escaped_speaker_id}" '
-            f'data-speaker-name="{escaped_speaker_name}" style="background-color:{boxclr}">'
-        )
-        if speaker_section:
-            html.append(f'      <span style="color:{spkrclr}">{spkr_name}</span><br>')
-        captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text] for c in webvtt.read(vtt_files[idx])]
-        vtt_filename = Path(vtt_files[idx]).name
-        for ci, c in enumerate(captions):
-            # VTT timestamps are relative to the audio segment, need to add diarization segment start time
-            vtt_start_sec = c[0] / 1000  # VTT timestamp in seconds
-            vtt_end_sec = c[1] / 1000
-            
-            # Add the diarization segment start time to get absolute video time
-            raw_start = vtt_start_sec + (shift / 1000) - spacer_offset_sec
-            raw_end = vtt_end_sec + (shift / 1000) - spacer_offset_sec
+  for idx, g in enumerate(groups):
+    # Use the actual start time of the diarization segment, not offset by spacermilli
+    shift = millisec(re.findall(r"[0-9]+:[0-9]+:[0-9]+\.[0-9]+", g[0])[0])
+    spacer_offset_sec = spacermilli / 1000.0
+    speaker = g[0].split()[-1]
+    spkr_name, boxclr, spkrclr = speakers.get(speaker, (speaker, def_boxclr, def_spkrclr))
+    escaped_speaker_id = html_module.escape(speaker, quote=True)
+    escaped_speaker_name = html_module.escape(spkr_name, quote=True)
+    html.append(f'    <div class="e" data-speaker-id="{escaped_speaker_id}" '
+                f'data-speaker-name="{escaped_speaker_name}" style="background-color:{boxclr}">')
+    if speaker_section:
+      html.append(f'      <span style="color:{spkrclr}">{spkr_name}</span><br>')
+    captions = [[int(millisec(c.start)), int(millisec(c.end)), c.text]
+                for c in webvtt.read(vtt_files[idx])]
+    vtt_filename = Path(vtt_files[idx]).name
+    for ci, c in enumerate(captions):
+      # VTT timestamps are relative to the audio segment, need to add diarization segment start time
+      vtt_start_sec = c[0] / 1000  # VTT timestamp in seconds
+      vtt_end_sec = c[1] / 1000
 
-            absolute_start_sec = max(0.0, raw_start)
-            # Normalize tiny offsets that stem from the spacer padding
-            if absolute_start_sec < 0.5 and vtt_start_sec == 0:
-                absolute_start_sec = 0.0
+      # Add the diarization segment start time to get absolute video time
+      raw_start = vtt_start_sec + (shift / 1000) - spacer_offset_sec
+      raw_end = vtt_end_sec + (shift / 1000) - spacer_offset_sec
 
-            absolute_end_sec = max(absolute_start_sec, raw_end)
-            
-            startStr = f"{int(absolute_start_sec//3600):02d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:05.2f}"
-            endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
-            timestamp = f"{int(absolute_start_sec//3600):01d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:04.1f}"
-            # Include speaker name and timestamp for DOCX export, wrapped for editing
-            # Add VTT file and timestamp data attributes for precise editing
-            html.append(f'      <div class="transcript-segment" '
-                       f'data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}" '
-                       f'data-vtt-file="{vtt_filename}" data-vtt-start="{vtt_start_sec}" data-vtt-end="{vtt_end_sec}" '
-                       f'data-caption-idx="{ci}">')
-            if speaker_inline:
-                html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
-            html.append(f'        <span class="timestamp">[{timestamp}] </span>')
-            html.append(f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>')
-            html.append(f'      </div>')
-        html.append("    </div>")
-    html.append("  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->")
-    
-    # Add JavaScript at the end of the body for proper DOM loading
-    javascript_code = """
+      absolute_start_sec = max(0.0, raw_start)
+      # Normalize tiny offsets that stem from the spacer padding
+      if absolute_start_sec < 0.5 and vtt_start_sec == 0:
+        absolute_start_sec = 0.0
+
+      absolute_end_sec = max(absolute_start_sec, raw_end)
+
+      startStr = f"{int(absolute_start_sec//3600):02d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:05.2f}"
+      endStr = f"{int(absolute_end_sec//3600):02d}:{int((absolute_end_sec%3600)//60):02d}:{absolute_end_sec%60:05.2f}"
+      timestamp = f"{int(absolute_start_sec//3600):01d}:{int((absolute_start_sec%3600)//60):02d}:{absolute_start_sec%60:04.1f}"
+      # Include speaker name and timestamp for DOCX export, wrapped for editing
+      # Add VTT file and timestamp data attributes for precise editing
+      html.append(
+          f'      <div class="transcript-segment" '
+          f'data-start="{absolute_start_sec}" data-end="{absolute_end_sec}" data-speaker="{spkr_name}" '
+          f'data-vtt-file="{vtt_filename}" data-vtt-start="{vtt_start_sec}" data-vtt-end="{vtt_end_sec}" '
+          f'data-caption-idx="{ci}">')
+      if speaker_inline:
+        html.append(f'        <span class="speaker-name">{spkr_name}: </span>')
+      html.append(f'        <span class="timestamp">[{timestamp}] </span>')
+      html.append(
+          f'        <span class="transcript-text"><a href="#{startStr}" class="lt" onclick="jumptoTime({int(absolute_start_sec)})">{c[2]}</a></span>'
+      )
+      html.append('      </div>')
+    html.append("    </div>")
+  html.append(
+      "  </div> <!-- end of class e and speaker segments -->\n    </div> <!-- end of content -->")
+
+  # Add JavaScript at the end of the body for proper DOM loading
+  javascript_code = """
     <script>
       console.log('Loading video highlight script...');
       
@@ -1041,71 +1069,71 @@ def generate_html(
     </script>
   </body>
 </html>"""
-    
-    html.append(javascript_code)
-    with open(outputHtml, "w", encoding="utf-8") as f:
-        f.write("\n".join(html))
-    
+
+  html.append(javascript_code)
+  with open(outputHtml, "w", encoding="utf-8") as f:
+    f.write("\n".join(html))
+
 
 def cleanup(files):
-    for f in files:
-        if os.path.isfile(f):
-            os.remove(f)
+  for f in files:
+    if os.path.isfile(f):
+      os.remove(f)
+
 
 def get_speaker_config_path(basename):
-    """Get the path to the speaker configuration file"""
-    return f"{basename}-speakers.json"
+  """Get the path to the speaker configuration file"""
+  return f"{basename}-speakers.json"
+
 
 def load_speaker_config(basename):
-    """Load speaker configuration from JSON file"""
-    config_path = get_speaker_config_path(basename)
-    if os.path.exists(config_path):
-        try:
-            import json
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-            # Convert to the format expected by generate_html
-            speakers = {}
-            for speaker_id, info in config.items():
-                if isinstance(info, dict):
-                    speakers[speaker_id] = (info.get('name', speaker_id), 
-                                          info.get('bgcolor', 'lightgray'), 
-                                          info.get('textcolor', 'darkorange'))
-                else:
-                    # Legacy format - just the name
-                    speakers[speaker_id] = (info, 'lightgray', 'darkorange')
-            return speakers
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"Warning: Could not load speaker config {config_path}: {e}")
-            return None
-    return None
+  """Load speaker configuration from JSON file"""
+  config_path = get_speaker_config_path(basename)
+  if os.path.exists(config_path):
+    try:
+      import json
+      with open(config_path, 'r') as f:
+        config = json.load(f)
+      # Convert to the format expected by generate_html
+      speakers = {}
+      for speaker_id, info in config.items():
+        if isinstance(info, dict):
+          speakers[speaker_id] = (info.get('name', speaker_id), info.get('bgcolor', 'lightgray'),
+                                  info.get('textcolor', 'darkorange'))
+        else:
+          # Legacy format - just the name
+          speakers[speaker_id] = (info, 'lightgray', 'darkorange')
+      return speakers
+    except (json.JSONDecodeError, KeyError) as e:
+      print(f"Warning: Could not load speaker config {config_path}: {e}")
+      return None
+  return None
+
 
 def save_speaker_config(basename, speakers):
-    """Save speaker configuration to JSON file"""
-    config_path = get_speaker_config_path(basename)
-    config = {}
-    for speaker_id, (name, bgcolor, textcolor) in speakers.items():
-        config[speaker_id] = {
-            'name': name,
-            'bgcolor': bgcolor,
-            'textcolor': textcolor
-        }
-    
-    try:
-        import json
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
-        print(f"Saved speaker configuration to {config_path}")
-    except Exception as e:
-        print(f"Warning: Could not save speaker config {config_path}: {e}")
+  """Save speaker configuration to JSON file"""
+  config_path = get_speaker_config_path(basename)
+  config = {}
+  for speaker_id, (name, bgcolor, textcolor) in speakers.items():
+    config[speaker_id] = {'name': name, 'bgcolor': bgcolor, 'textcolor': textcolor}
+
+  try:
+    import json
+    with open(config_path, 'w') as f:
+      json.dump(config, f, indent=2)
+    print(f"Saved speaker configuration to {config_path}")
+  except Exception as e:
+    print(f"Warning: Could not save speaker config {config_path}: {e}")
+
 
 def discover_speakers_from_groups(groups):
-    """Analyze diarization groups to discover which speakers are actually present"""
-    speakers_found = set()
-    for g in groups:
-        speaker = g[0].split()[-1]  # Extract speaker ID from diarization line
-        speakers_found.add(speaker)
-    return sorted(list(speakers_found))
+  """Analyze diarization groups to discover which speakers are actually present"""
+  speakers_found = set()
+  for g in groups:
+    speaker = g[0].split()[-1]  # Extract speaker ID from diarization line
+    speakers_found.add(speaker)
+  return sorted(list(speakers_found))
+
 
 def transcribe_video(
     inputfile,
@@ -1122,112 +1150,107 @@ def transcribe_video(
     called_by_mercuryweb=False,
     mercury_command: str | None = None,
 ):
-    basename = Path(inputfile).stem
-    workdir = basename
-    Path(workdir).mkdir(exist_ok=True)
-    os.chdir(workdir)
+  basename = Path(inputfile).stem
+  workdir = basename
+  Path(workdir).mkdir(exist_ok=True)
+  os.chdir(workdir)
 
-    # Prepare audio
-    inputWavCache = f"{basename}.cache.wav"
-    # If the caller provided an absolute path, don't prefix with "../" (that corrupts absolute paths
-    # when the code changes into the workdir). Use the absolute or original path accordingly.
-    if os.path.isabs(str(inputfile)):
-        input_arg = str(inputfile)
+  # Prepare audio
+  inputWavCache = f"{basename}.cache.wav"
+  # If the caller provided an absolute path, don't prefix with "../" (that corrupts absolute paths
+  # when the code changes into the workdir). Use the absolute or original path accordingly.
+  if os.path.isabs(str(inputfile)):
+    input_arg = str(inputfile)
+  else:
+    input_arg = f"../{inputfile}"
+  convert_to_wav(input_arg, inputWavCache)
+  outputWav = f"{basename}-spaced.wav"
+  create_spaced_audio(inputWavCache, outputWav)
+
+  diarizationFile = f"{basename}-diarization.txt"
+  dzs = get_diarization(outputWav, diarizationFile, num_speakers, min_speakers, max_speakers)
+  groups = group_segments(dzs)
+
+  segment_files = export_segments_audio(groups, outputWav)
+  vtt_files = transcribe_segments(
+      segment_files,
+      model_size=whisper_model,
+      device=whisper_device,
+      compute_type=whisper_compute_type,
+      coreml_units=coreml_units,
+  )
+
+  # Discover which speakers are actually present
+  actual_speakers = discover_speakers_from_groups(groups)
+  print(f"Detected speakers: {actual_speakers}")
+
+  # Try to load existing speaker config first
+  speakers = load_speaker_config(basename)
+
+  if speakers is None:
+    # No config exists, create default mapping
+    speakers = {}
+    default_colors = [('lightgray', 'darkorange'), ('#e1ffc7', 'darkgreen'),
+                      ('#ffe1e1', 'darkblue'), ('#e1e1ff', 'darkred'), ('#fff1e1', 'darkpurple'),
+                      ('#f1e1ff', 'darkcyan')]
+
+    if speaker_names:
+      # Use provided speaker names
+      for i, name in enumerate(speaker_names):
+        if i < len(actual_speakers):
+          speaker_id = actual_speakers[i]
+          bgcolor, textcolor = default_colors[i % len(default_colors)]
+          speakers[speaker_id] = (name, bgcolor, textcolor)
     else:
-        input_arg = f"../{inputfile}"
-    convert_to_wav(input_arg, inputWavCache)
-    outputWav = f"{basename}-spaced.wav"
-    create_spaced_audio(inputWavCache, outputWav)
+      # Create default names for detected speakers
+      for i, speaker_id in enumerate(actual_speakers):
+        bgcolor, textcolor = default_colors[i % len(default_colors)]
+        speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
 
-    diarizationFile = f"{basename}-diarization.txt"
-    dzs = get_diarization(outputWav, diarizationFile, num_speakers, min_speakers, max_speakers)
-    groups = group_segments(dzs)
+    # Save the initial config
+    save_speaker_config(basename, speakers)
+    print(f"Created speaker config file: {get_speaker_config_path(basename)}")
+    print("You can edit speaker names and rerun to update the transcript.")
 
-    segment_files = export_segments_audio(groups, outputWav)
-    vtt_files = transcribe_segments(
-        segment_files,
-        model_size=whisper_model,
-        device=whisper_device,
-        compute_type=whisper_compute_type,
-        coreml_units=coreml_units,
-    )
+  # Ensure all detected speakers have entries (in case new speakers appeared)
+  updated = False
+  for speaker_id in actual_speakers:
+    if speaker_id not in speakers:
+      # New speaker detected, add with default settings
+      i = len(speakers)
+      bgcolor, textcolor = default_colors[i % len(default_colors)]
+      speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
+      updated = True
 
-    # Discover which speakers are actually present
-    actual_speakers = discover_speakers_from_groups(groups)
-    print(f"Detected speakers: {actual_speakers}")
+  if updated:
+    save_speaker_config(basename, speakers)
+    print("Updated speaker config with newly detected speakers")
 
-    # Try to load existing speaker config first
-    speakers = load_speaker_config(basename)
-    
-    if speakers is None:
-        # No config exists, create default mapping
-        speakers = {}
-        default_colors = [
-            ('lightgray', 'darkorange'),
-            ('#e1ffc7', 'darkgreen'), 
-            ('#ffe1e1', 'darkblue'),
-            ('#e1e1ff', 'darkred'),
-            ('#fff1e1', 'darkpurple'),
-            ('#f1e1ff', 'darkcyan')
-        ]
-        
-        if speaker_names:
-            # Use provided speaker names
-            for i, name in enumerate(speaker_names):
-                if i < len(actual_speakers):
-                    speaker_id = actual_speakers[i]
-                    bgcolor, textcolor = default_colors[i % len(default_colors)]
-                    speakers[speaker_id] = (name, bgcolor, textcolor)
-        else:
-            # Create default names for detected speakers
-            for i, speaker_id in enumerate(actual_speakers):
-                bgcolor, textcolor = default_colors[i % len(default_colors)]
-                speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
-        
-        # Save the initial config
-        save_speaker_config(basename, speakers)
-        print(f"Created speaker config file: {get_speaker_config_path(basename)}")
-        print("You can edit speaker names and rerun to update the transcript.")
-    
-    # Ensure all detected speakers have entries (in case new speakers appeared)
-    updated = False
-    for speaker_id in actual_speakers:
-        if speaker_id not in speakers:
-            # New speaker detected, add with default settings
-            i = len(speakers)
-            bgcolor, textcolor = default_colors[i % len(default_colors)]
-            speakers[speaker_id] = (f"Speaker {i+1}", bgcolor, textcolor)
-            updated = True
-    
-    if updated:
-        save_speaker_config(basename, speakers)
-        print("Updated speaker config with newly detected speakers")
+  generate_html(
+      f"../{basename}.html",
+      groups,
+      vtt_files,
+      inputfile,
+      speakers,
+      speaker_section=speaker_section,
+      speaker_inline=speaker_inline,
+      called_by_mercuryweb=called_by_mercuryweb,
+      mercury_command=mercury_command,
+  )
+  cleanup([inputWavCache, outputWav] + segment_files)
+  print(f"Script completed successfully! Output: ../{basename}.html")
 
-    generate_html(
-        f"../{basename}.html",
-        groups,
-        vtt_files,
-        inputfile,
-        speakers,
-        speaker_section=speaker_section,
-        speaker_inline=speaker_inline,
-        called_by_mercuryweb=called_by_mercuryweb,
-        mercury_command=mercury_command,
-    )
-    cleanup([inputWavCache, outputWav] + segment_files)
-    print(f"Script completed successfully! Output: ../{basename}.html")
 
 def main():
-    # Debug logging for CLI startup
-    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
-    log_path = os.path.join(exe_dir, "bundle_run.log")
-    with open(log_path, "a", encoding="utf-8") as fh:
-        fh.write(f"[CLI main] Starting CLI with args: {sys.argv}\n")
-    
-    parser = argparse.ArgumentParser(
-        description='Transcribe video/audio with speaker diarization',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+  # Debug logging for CLI startup
+  exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+  log_path = os.path.join(exe_dir, "bundle_run.log")
+  with open(log_path, "a", encoding="utf-8") as fh:
+    fh.write(f"[CLI main] Starting CLI with args: {sys.argv}\n")
+
+  parser = argparse.ArgumentParser(description='Transcribe video/audio with speaker diarization',
+                                   formatter_class=argparse.RawDescriptionHelpFormatter,
+                                   epilog='''
 Examples:
   # Basic transcription
   %(prog)s video.mp4
@@ -1243,78 +1266,77 @@ Examples:
   
   # Combine speaker names with constraints
   %(prog)s video.mp4 --num-speakers 2 "Alice" "Bob"
-        '''
-    )
-    
-    parser.add_argument('--version', action='version', version=f"transcribe-with-whisper {get_package_version()}",
-                        help="Show the application's version number and exit")
+        ''')
 
-    parser.add_argument('video_file', help='Video or audio file to transcribe')
-    parser.add_argument('speaker_names', nargs='*', help='Optional speaker names (e.g., "Alice" "Bob")')
-    parser.add_argument('--num-speakers', type=int, metavar='N',
-                        help='Exact number of speakers (improves diarization accuracy)')
-    parser.add_argument('--min-speakers', type=int, metavar='N',
-                        help='Minimum number of speakers')
-    parser.add_argument('--max-speakers', type=int, metavar='N',
-                        help='Maximum number of speakers')
-    parser.add_argument(
-        '--speaker-section',
-        dest='speaker_section',
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help='Include speaker when speakers switch turns.'
-    )
-    parser.add_argument(
-        '--speaker-inline',
-        dest='speaker_inline',
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help='Include speaker label on each line (use --no-speaker-inline to hide).'
-    )
-    parser.add_argument(
-        '--called-by-mercuryweb',
-        dest='called_by_mercuryweb',
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help='Indicate whether the invocation originated from the Mercury web interface.'
-    )
-    args = parser.parse_args()
-    command_line = " ".join(shlex.quote(arg) for arg in sys.argv)
-    
-    # Validate speaker constraints
-    if args.num_speakers is not None and (args.min_speakers is not None or args.max_speakers is not None):
-        print("Error: Cannot use --num-speakers with --min-speakers or --max-speakers")
-        sys.exit(1)
-    
-    if args.num_speakers is not None and args.num_speakers < 1:
-        print("Error: --num-speakers must be at least 1")
-        sys.exit(1)
-    
-    if args.min_speakers is not None and args.min_speakers < 1:
-        print("Error: --min-speakers must be at least 1")
-        sys.exit(1)
-    
-    if args.max_speakers is not None and args.max_speakers < 1:
-        print("Error: --max-speakers must be at least 1")
-        sys.exit(1)
-    
-    if args.min_speakers is not None and args.max_speakers is not None:
-        if args.min_speakers > args.max_speakers:
-            print("Error: --min-speakers cannot be greater than --max-speakers")
-            sys.exit(1)
+  parser.add_argument('--version',
+                      action='version',
+                      version=f"transcribe-with-whisper {get_package_version()}",
+                      help="Show the application's version number and exit")
 
-    transcribe_video(
-        args.video_file, 
-        args.speaker_names if args.speaker_names else None,
-        args.num_speakers,
-        args.min_speakers,
-        args.max_speakers,
-        speaker_section=args.speaker_section,
-        speaker_inline=args.speaker_inline,
-        called_by_mercuryweb=args.called_by_mercuryweb,
-        mercury_command=command_line,
-    )    
+  parser.add_argument('video_file', help='Video or audio file to transcribe')
+  parser.add_argument('speaker_names',
+                      nargs='*',
+                      help='Optional speaker names (e.g., "Alice" "Bob")')
+  parser.add_argument('--num-speakers',
+                      type=int,
+                      metavar='N',
+                      help='Exact number of speakers (improves diarization accuracy)')
+  parser.add_argument('--min-speakers', type=int, metavar='N', help='Minimum number of speakers')
+  parser.add_argument('--max-speakers', type=int, metavar='N', help='Maximum number of speakers')
+  parser.add_argument('--speaker-section',
+                      dest='speaker_section',
+                      action=argparse.BooleanOptionalAction,
+                      default=False,
+                      help='Include speaker when speakers switch turns.')
+  parser.add_argument('--speaker-inline',
+                      dest='speaker_inline',
+                      action=argparse.BooleanOptionalAction,
+                      default=True,
+                      help='Include speaker label on each line (use --no-speaker-inline to hide).')
+  parser.add_argument(
+      '--called-by-mercuryweb',
+      dest='called_by_mercuryweb',
+      action=argparse.BooleanOptionalAction,
+      default=False,
+      help='Indicate whether the invocation originated from the Mercury web interface.')
+  args = parser.parse_args()
+  command_line = " ".join(shlex.quote(arg) for arg in sys.argv)
+
+  # Validate speaker constraints
+  if args.num_speakers is not None and (args.min_speakers is not None
+                                        or args.max_speakers is not None):
+    print("Error: Cannot use --num-speakers with --min-speakers or --max-speakers")
+    sys.exit(1)
+
+  if args.num_speakers is not None and args.num_speakers < 1:
+    print("Error: --num-speakers must be at least 1")
+    sys.exit(1)
+
+  if args.min_speakers is not None and args.min_speakers < 1:
+    print("Error: --min-speakers must be at least 1")
+    sys.exit(1)
+
+  if args.max_speakers is not None and args.max_speakers < 1:
+    print("Error: --max-speakers must be at least 1")
+    sys.exit(1)
+
+  if args.min_speakers is not None and args.max_speakers is not None:
+    if args.min_speakers > args.max_speakers:
+      print("Error: --min-speakers cannot be greater than --max-speakers")
+      sys.exit(1)
+
+  transcribe_video(
+      args.video_file,
+      args.speaker_names if args.speaker_names else None,
+      args.num_speakers,
+      args.min_speakers,
+      args.max_speakers,
+      speaker_section=args.speaker_section,
+      speaker_inline=args.speaker_inline,
+      called_by_mercuryweb=args.called_by_mercuryweb,
+      mercury_command=command_line,
+  )
 
 
 if __name__ == "__main__":
-    main()
+  main()

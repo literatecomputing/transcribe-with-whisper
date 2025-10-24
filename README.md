@@ -37,6 +37,46 @@ Two ways to use this project:
   - Run: `transcribe-with-whisper yourfile.mp4 [Speaker1 Speaker2 ...]`
   - More: see `docs/README-transcribe-with-whisper.md`
 
+## Releases
+
+We publish three main kinds of distributable artifacts for this project:
+
+- Docker images (multi-arch) pushed to GitHub Container Registry (GHCR) — these include `-web` and `-cli` images.
+- Windows bundle (a packaged Python distribution containing `MercuryScribe.exe`, a `start-server.bat`, and helper files) — produced by the Windows PyInstaller job and attached as build artifacts / release assets.
+- Python package on PyPI (`transcribe-with-whisper`) — sdist and wheel uploaded to PyPI on release.
+
+How releases are triggered
+-------------------------
+
+There are two common ways CI publishes these artifacts:
+
+- Git tag pushes (recommended): create an annotated tag like `v1.2.3` and push it (`git tag -a v1.2.3 -m "Release v1.2.3" && git push origin v1.2.3`). Workflows that listen for tag pushes (refs/tags/v*) will build and publish artifacts.
+- GitHub Releases: creating a Release in the GitHub UI (which normally creates a tag for you). Workflows that listen for the `release.published` event will run and publish artifacts.
+
+Which to use?
+
+- Recommended: push an annotated tag. Tags are explicit, scriptable, and reproducible. Creating releases from the tag is fine (the CI will pick up either event if configured).
+- If you prefer the GitHub UI, create a Release and publish it there — CI workflows that listen for `release.published` will behave the same as tag pushes if configured.
+
+Manual and pre-release checks
+-----------------------------
+
+- All artifact-producing workflows in this repository are designed to run validation on pull requests (so PRs validate buildability), but they will not upload or publish artifacts for PR runs. This prevents large artifacts from appearing on PRs and keeps publishing gated to releases.
+- Maintainers can run builds manually via `workflow_dispatch`. Whether manual runs publish artifacts is decided per-workflow; in general, manual runs can be used to produce artifacts for debugging or to create a release candidate.
+
+Where to find published artifacts
+---------------------------------
+
+- Docker images: GHCR under `ghcr.io/literatecomputing/` (image names include `transcribe-with-whisper-web` and `transcribe-with-whisper-cli`). See the Actions run logs for exact tag names (e.g., `latest-amd64`, `v1.2.3`).
+- Windows bundle: attached as an artifact on the GitHub Actions run and typically added to a GitHub Release as an asset.
+- PyPI package: uploaded to PyPI as `transcribe-with-whisper`.
+
+Policy and details
+------------------
+
+See `.github/trigger-policy.md` for the CI trigger policy, a recommended guard expression to protect upload/publish steps, and examples for guarding Docker pushes and artifact uploads.
+
+
 ## What transcribe-with-whisper Does
 
 TL;DR: takes a video file, makes an HTML page that tracks the transcription with the playing video and makes video jump to text that you click. A `.docx` file with timestamps, which should be suitable for use with packages like MAXQDA is also created.

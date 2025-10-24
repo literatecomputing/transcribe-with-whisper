@@ -1,6 +1,6 @@
 # PyInstaller hook for asteroid_filterbanks
 # Ensures the package's submodules and any non-Python data are collected
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # Attempt to collect all submodules and data files from the installed
 # `asteroid_filterbanks` package. On CI the package may not be installed

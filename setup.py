@@ -1,11 +1,11 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
     name="transcribe-with-whisper",
-    version="0.7.5",
+    version="0.7.6",
     packages=find_packages(),
     install_requires=[
         "pydub==0.25.1",
