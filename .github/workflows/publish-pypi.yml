@@ -40,9 +40,20 @@ jobs:
       - name: Build sdist and wheel
         run: python -m build
 
+      - name: PyPI packaging smoke-test (install wheel)
+        run: |
+          python -m pip install --upgrade pip
+          # Install the built wheel into the runner environment to ensure it
+          # installs and the package can be imported. Use --no-deps to avoid
+          # installing heavy runtime deps in this smoke check.
+          pip install dist/*.whl --no-deps
+          python -c "import importlib; m = importlib.import_module('transcribe_with_whisper.main'); print(m.get_package_version())"
+
       # No credentials necessary: https://pypi.org/manage/project/transcribe-with-whisper/settings/publishing/
       - name: Publish to PyPI
         if: |
           (github.event_name == 'release' && github.event.action == 'published') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
