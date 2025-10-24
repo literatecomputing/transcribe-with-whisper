@@ -49,11 +49,34 @@ jobs:
           pip install dist/*.whl --no-deps
           python -c "import importlib; m = importlib.import_module('transcribe_with_whisper.main'); print(m.get_package_version())"
 
+      - name: Check PyPI for existing version
+        id: check_pypi
+        run: |
+          set -euo pipefail
+          # Extract version from built wheel filename (dist/transcribe_with_whisper-<version>-*.whl)
+          whl=$(basename dist/*.whl)
+          echo "Found wheel: $whl"
+          version=$(python -c "import os,re,sys; fn=os.path.basename('$whl'); m=re.search(r'transcribe_with_whisper-([0-9]+\.[0-9]+\.[0-9]+)', fn); print(m.group(1) if m else '')")
+          if [ -z "$version" ]; then
+            echo "Could not parse version from wheel filename; failing" >&2
+            exit 1
+          fi
+          echo "Built version: $version"
+          # Query PyPI for current version (empty if unreachable). Use curl + a short python -c
+          remote=$(curl -s https://pypi.org/pypi/transcribe-with-whisper/json | python -c "import sys,json; data=sys.stdin.read(); print(json.loads(data)['info']['version'] if data else '')" || true)
+          echo "Remote PyPI version: $remote"
+          if [ -n "$remote" ] && [ "$remote" = "$version" ]; then
+            echo "version_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "version_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       # No credentials necessary: https://pypi.org/manage/project/transcribe-with-whisper/settings/publishing/
       - name: Publish to PyPI
         if: |
-          (github.event_name == 'release' && github.event.action == 'published') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
+          ((github.event_name == 'release' && github.event.action == 'published') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')) &&
+          steps.check_pypi.outputs.version_exists != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
