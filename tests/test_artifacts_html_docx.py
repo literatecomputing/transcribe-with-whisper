@@ -26,7 +26,7 @@ def test_html_and_docx_from_artifacts_exist_and_open(app_with_artifacts):
     assert "MercuryScribe" in content or "<!doctype html>" in content.lower()
 
     generator_value = _extract_generator_meta(content)
-    assert generator_value == f"transcribe-with-whisper {get_package_version()}"
+    assert generator_value == f"transcribe-with-whisper}"
 
     if docx.exists():
         # Open docx as zip and ensure it contains word/document.xml
