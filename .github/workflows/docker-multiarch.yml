@@ -1,7 +1,12 @@
 name: Build and Publish Docker Images (Multi-arch)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Set to true to push images and create manifests when running manually'
+        required: false
+        default: 'false'
   push:
     tags: ["v*"]
     branches:
@@ -85,8 +90,8 @@ jobs:
           context: .
           file: ${{ matrix.file }}
           platforms: ${{ matrix.platform }}
-          # Only push images for release tag pushes or manual dispatches. PRs will build but not push.
-          push: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch' }}
+          # Only push images for release tag pushes or manual dispatches (opt-in).
+          push: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true') }}
           tags: |
             ${{ steps.img.outputs.image }}:latest-${{ matrix.arch }}
             ${{ steps.img.outputs.image }}:${{ github.sha }}-${{ matrix.arch }}
@@ -96,11 +101,11 @@ jobs:
   create-manifest:
     needs: build-and-push
     runs-on: ubuntu-latest
-    # Only create and push manifests for tag pushes, release publishes, or manual dispatches
+    # Only create and push manifests for tag pushes, release publishes, or manual dispatches (opt-in).
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'release' && github.event.action == 'published') ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
     strategy:
       matrix:
         suffix: [web, cli]
