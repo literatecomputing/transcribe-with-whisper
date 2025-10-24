@@ -376,3 +376,4 @@ Note that some tools can work with the `.vtt` files that are created in the dire
 - ✅ **Enhanced Timestamps**: Transcripts include speaker names and timestamps for better DOCX export
 
 ## TODO
+why is sqlite3 and sqlalchemy and pandas hooks all included? We're not using those.

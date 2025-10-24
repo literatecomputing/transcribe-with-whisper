@@ -4,17 +4,35 @@ __pycache__/
 .env
 .venv/
 venv/
-/*.egg-info/
-*.log
+run-*/
+.venv-*
+.venv-ci/
 *.egg-info/
-venv
+*.log
 uploads/
 mercuryscribe/
+build/
 dist/
 
-# packaging artifacts
-packaging/
-# allow the helper scripts needed for CI and packaging
+# packaging artifacts - ignore only caches, not the entire packaging tree
+packaging/__pycache__/
+packaging/*/__pycache__/
+packaging/ffmpeg
+# allow packaging contents (scripts, resources) to be tracked
 !packaging/windows/
 !packaging/windows/*
+!packaging/windows/build_windows.ps1
+!packaging/windows/build-windows.ps1
 *.zip
+
+# PyInstaller and Python caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.cache/
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+desktop.ini

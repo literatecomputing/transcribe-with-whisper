@@ -1,0 +1,29 @@
+# Core dependencies for Windows (x86_64)
+# This file is intended for building the Windows one-dir bundle.
+# Keep it aligned with requirements-amd64.txt; add any Windows-specific pins here.
+
+pydub==0.25.1
+webvtt-py==0.5.1
+pyannote.audio==4.0.0
+huggingface_hub==0.35.3
+torch==2.8.0     # CPU-only by default
+faster-whisper==1.2.0
+
+# Web server dependencies (for enhanced progress tracking)
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+python-multipart==0.0.20
+
+# Optional dependency required by some pyannote segmentation models (SincNet)
+# Add this so PyInstaller can collect it during the Windows build.
+asteroid-filterbanks
+
+# HTML -> DOCX conversion (pure-Python)
+python-docx>=0.8.12
+htmldocx
+
+# Notes:
+# - Build the Windows bundle on Windows with these installed in the build venv so
+#   PyInstaller captures the packages into the one-dir artifact.
+# - If you create separate CI jobs, use requirements-amd64.txt for linux/amd64 docker
+#   images and requirements-arm64.txt for Apple silicon or ARM64 images.
