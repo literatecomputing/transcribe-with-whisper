@@ -94,14 +94,21 @@ jobs:
           Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs"
           & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs
 
-      - name: Upload dist for manual download (even on failure)
-        if: always()
+      - name: Upload dist for release/tag
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'release' && github.event.action == 'published') ||
+          github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: MercuryScribe-dist
           path: dist/MercuryScribe
 
       - name: Upload built artifact
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'release' && github.event.action == 'published') ||
+          github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: MercuryScribe-windows-x86_64
