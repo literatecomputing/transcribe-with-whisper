@@ -2,9 +2,9 @@
 name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - "v*" # e.g., v0.1.1
+  # Publish only when a GitHub Release is published (recommended) or via
+  # manual dispatch. Removing the tag push trigger prevents duplicate
+  # publishes when a tag push and a release.published both occur.
   release:
     types: [published]
   workflow_dispatch:
@@ -43,13 +43,6 @@ jobs:
       # No credentials necessary: https://pypi.org/manage/project/transcribe-with-whisper/settings/publishing/
       - name: Publish to PyPI
         if: |
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
           (github.event_name == 'release' && github.event.action == 'published') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # If a package file with the same filename+hash already exists on PyPI,
-          # don't fail the workflow. This avoids a hard failure when a tag push
-          # and a release publish both trigger the publish step for the same
-          # distribution.
-          skip-existing: true
