@@ -68,6 +68,19 @@ jobs:
           Copy-Item $f.FullName packaging\\ffmpeg\\ffmpeg.exe -Force
           Copy-Item $p.FullName packaging\\ffmpeg\\ffprobe.exe -Force
 
+      - name: Get package version
+        id: get_version
+        shell: pwsh
+        run: |
+          # Read version from setup.py (simple regex) and export as env var
+          $text = Get-Content -Raw -Path 'setup.py'
+          if ($text -match "version\s*=\s*'([^']+)'") { $v = $matches[1] }
+          elseif ($text -match 'version\s*=\s*"([^"]+)"') { $v = $matches[1] }
+          else { Write-Error 'Could not find version in setup.py'; exit 1 }
+          Write-Output "Package version: $v"
+          # Export for later steps
+          Add-Content -Path $Env:GITHUB_ENV -Value "WIN_BUNDLE_VERSION=$v"
+
       - name: Run build script (debug + run)
         shell: pwsh
         working-directory: ${{ github.workspace }}
@@ -96,16 +109,34 @@ jobs:
             Write-Error "pwsh not found on PATH"
             exit 1
           }
-          Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs"
-          & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs
+          Write-Output "Invoking pwsh: $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs -OutputZip MercuryScribe-windows-$Env:WIN_BUNDLE_VERSION-x86_64.zip"
+          & $pwshExe -NoProfile -ExecutionPolicy Bypass -File $scriptAbs -OutputZip "MercuryScribe-windows-$Env:WIN_BUNDLE_VERSION-x86_64.zip"
 
       - name: Upload Windows bundle to GitHub Release
         if: |
           (github.event_name == 'release' && github.event.action == 'published') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
-        uses: actions/upload-release-asset@v1
+        uses: actions/github-script@v6
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: MercuryScribe-windows-x86_64.zip
-          asset_name: MercuryScribe-windows-x86_64.zip
-          asset_content_type: application/zip
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const releaseId = context.payload.release.id;
+            const filename = `MercuryScribe-windows-${process.env.WIN_BUNDLE_VERSION}-x86_64.zip`;
+            if (!fs.existsSync(filename)) {
+              core.setFailed(`Artifact not found: ${filename}`);
+              return;
+            }
+            const data = fs.readFileSync(filename);
+            await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id: releaseId,
+              name: filename,
+              data,
+              headers: {
+                'content-type': 'application/zip',
+                'content-length': data.length
+              }
+            });
