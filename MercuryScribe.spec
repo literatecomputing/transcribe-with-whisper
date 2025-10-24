@@ -31,7 +31,7 @@ hidden_imports = [
     'transcribe_with_whisper',
     'transcribe_with_whisper.server_app',
     'docx',
-    'htmldocx',
+    'htmldocx>=0.0.14
 ]
 hidden_imports.extend(pyannote_subs)
 

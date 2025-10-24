@@ -14,4 +14,4 @@ python-multipart==0.0.20
 
 # HTML -> DOCX conversion (pure-Python)
 python-docx>=0.8.12
-htmldocx==0.0.6
+htmldocx>=0.0.14
