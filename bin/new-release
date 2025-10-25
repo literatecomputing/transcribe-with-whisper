@@ -39,9 +39,7 @@ if [ "$#" -eq 0 ]; then
     echo "Latest release: $TAG_NAME"
     gh release view "$TAG_NAME" --json tagName,name,body,createdAt,publishedAt,url --jq '{tag: .tagName, name: .name, url: .url, published: .publishedAt, created: .createdAt, notes: .body}'
     exit 0
-  else
-    echo "No releases found in this repository."
-    exit 0
+
   fi
 fi
 
@@ -77,6 +75,31 @@ if git ls-remote --tags origin --refs "refs/tags/$TAG" | grep -q "refs/tags/$TAG
   echo "Tag $TAG already exists on remote. Aborting." >&2
   exit 1
 fi
+
+# Normalize version without leading 'v' for files that contain bare versions
+if [[ "$RAW_VER" == v* ]]; then
+  VER_NO_V="${RAW_VER#v}"
+else
+  VER_NO_V="$RAW_VER"
+fi
+
+echo "Updating version in setup.py to $VER_NO_V"
+# Update the first occurrence of version= in setup.py. Exit if not found.
+if ! grep -qE "version\s*=\s*['\"][0-9]+\.[0-9]+\.[0-9]+['\"]" setup.py; then
+  echo 'Could not find version= in setup.py' >&2
+  exit 1
+fi
+# Replace only the first occurrence of version=... with the new version
+sed -E -i "0,/version\s*=\s*['\"][^'\"]+['\"]/s//version=\"${VER_NO_V}\"/" setup.py
+echo 'setup.py updated'
+
+git add setup.py
+git commit -m "Bump version to $VER_NO_V"
+
+# Push the commit to the current branch so the tag points at a pushed commit
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "Pushing commit to origin/$BRANCH"
+git push origin "$BRANCH"
 
 CURRENT_HEAD=$(git rev-parse --verify HEAD)
 
