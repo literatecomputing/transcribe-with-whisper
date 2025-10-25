@@ -30,6 +30,10 @@ concurrency:
 
 jobs:
   build-and-push:
+    # Only run the heavy docker build job for releases or when manually requested.
+    if: |
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
