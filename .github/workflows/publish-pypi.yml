@@ -98,7 +98,13 @@ jobs:
             const { data: release } = await github.rest.repos.getRelease({ owner, repo, release_id: releaseId });
             let body = release.body || '';
             if (!body.includes(pypiUrl)) {
-              const note = `\n\n### Distribution\n- PyPI: ${pypiUrl}\n- Windows bundle: attached to this release as \`${windowsAsset}\` (see Assets)\n- Docker images: \`${dockerWeb}:latest\`, \`${dockerCli}:latest\` (also available as SHA-tagged images)\n\nYou can install the Python package with `pip install transcribe-with-whisper`.\n`;
+              const note = '\n\n### Distribution\n' +
+                '- PyPI: ' + pypiUrl + '\n' +
+                '- Windows bundle: attached to this release as `' + windowsAsset + '` (see Assets)\n' +
+                '- Docker images: `' + dockerWeb + ':latest`, `' + dockerCli + ':latest`' +
+                ' (also available as SHA-tagged images)\n\n' +
+                'You can install the Python package with `pip install ' +
+                'transcribe-with-whisper`.\n';
               body = body + note;
               await github.rest.repos.updateRelease({ owner, repo, release_id: releaseId, body });
             } else {
