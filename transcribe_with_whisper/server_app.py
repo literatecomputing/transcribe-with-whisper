@@ -187,7 +187,7 @@ INDEX_HTML = """
       <p class=\"tip\">You can manage or edit files on your computer in <code>~/mercuryscribe</code> or see them here <a href=\"/list\">here</a>.</p>
       <form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\" onsubmit=\"document.getElementById('submit').disabled = true; document.getElementById('submit').innerText='Processing…';\">
         <input type=\"file\" name=\"file\" accept=\"video/*,audio/*\" required>
-        
+
         <details>
           <summary>🎙️ Speaker Configuration (Optional - improves accuracy)</summary>
           <div style=\"padding: 0.5rem 0;\">
@@ -196,7 +196,7 @@ INDEX_HTML = """
               <input type=\"number\" id=\"num-speakers\" name=\"num_speakers\" min=\"1\" max=\"20\" placeholder=\"Auto\">
             </div>
             <div class=\"help-text\">If you know the exact number of speakers, enter it here for better accuracy. Leave blank for automatic detection.</div>
-            
+
             <div class=\"row\" style=\"margin-top: 0.75rem;\">
               <label for=\"min-speakers\">Min speakers:</label>
               <input type=\"number\" id=\"min-speakers\" name=\"min_speakers\" min=\"1\" max=\"20\" placeholder=\"Auto\">
@@ -208,17 +208,7 @@ INDEX_HTML = """
             <div class=\"help-text\">Or specify a range if you're unsure of the exact number.</div>
           </div>
         </details>
-        
-        <details>
-          <summary>👥 Speaker Names (Optional)</summary>
-          <div style=\"padding: 0.5rem 0;\">
-            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 1\"></div>
-            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 2\"></div>
-            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 3\"></div>
-            <div class=\"row\"><input type=\"text\" name=\"speaker\" placeholder=\"Speaker 4\"></div>
-          </div>
-        </details>
-        
+
         <button id=\"submit\" type=\"submit\">Transcribe</button>
       </form>
     </div>
@@ -266,7 +256,7 @@ SETUP_HTML = """
     <div class=\"card\">
       <h1>🚀 Welcome to MercuryScribe!</h1>
       <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
-      
+
     </div>
 
     <div class=\"card\">
@@ -300,17 +290,20 @@ SETUP_HTML = """
 
             <div class="card">
                 <h2>🧠 Required AI Models</h2>
-                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below (it will open in a new tab), click the <strong>Agree and access repository</strong> at the bottom of the page before clicking the save button herre.</p>
+                <p>MercuryScribe needs access to gated HuggingFace models. Open each link below (it will open in a new tab), click the <strong>Agree and access repository</strong> at the bottom of the page before clicking the save button here.</p>
                 <ul class="model-list">
     __MODEL_LIST_ITEMS__
                 </ul>
                 <div class="tip">
-                    <strong>Why multiple models?</strong> Different platforms may install pyannote.audio 3.x or 4.x. Your token should cover the entries above so MercuryScribe can diarize speakers regardless of environment.
+                    <strong>Need more help?</strong> There is a video guide available on the <a href="https://www.mercuryscribe.com/docs/get-started/" target="_blank">get-started page</a>.
                 </div>
             </div>
 
     <div class=\"card\">
       <h2>🔑 Enter Your Token</h2>
+          <small style=\"color: #666; display: block; margin-top: 0.25rem;\">
+            Scroll up for instructions on obtaining a token and accepting the required model licenses.
+          </small>
       <div class=\"token-form\">
         <div class=\"form-group\">
           <label for=\"token\">HuggingFace Access Token:</label>
@@ -319,12 +312,12 @@ SETUP_HTML = """
             Your token is hidden for security. Click "Show" to verify it's correct.
           </small>
         </div>
-        
+
         <div class=\"button-group\">
           <button onclick=\"toggleTokenVisibility()\" class=\"secondary\" id=\"toggleBtn\">👁️ Show</button>
           <button onclick=\"validateAndSaveToken()\" id=\"saveBtn\">💾 Save Token</button>
         </div>
-        
+
         <div id=\"status\" class=\"status\"></div>
       </div>
     </div>
@@ -337,34 +330,34 @@ SETUP_HTML = """
 
     <script>
       let tokenVisible = false;
-      
+
       function toggleTokenVisibility() {
         const tokenInput = document.getElementById('token');
         const toggleBtn = document.getElementById('toggleBtn');
-        
+
         tokenVisible = !tokenVisible;
         tokenInput.type = tokenVisible ? 'text' : 'password';
         toggleBtn.textContent = tokenVisible ? '🙈 Hide' : '👁️ Show';
       }
-      
+
       async function validateAndSaveToken() {
         const token = document.getElementById('token').value.trim();
         const saveBtn = document.getElementById('saveBtn');
         const status = document.getElementById('status');
-        
+
         if (!token) {
           showStatus('Please enter your HuggingFace token.', 'error');
           return;
         }
-        
+
         if (!token.startsWith('hf_')) {
           showStatus('Invalid token format. HuggingFace tokens start with \"hf_\".', 'error');
           return;
         }
-        
+
         saveBtn.disabled = true;
         saveBtn.textContent = '⏳ Validating...';
-        
+
         try {
           const response = await fetch('/api/save-token', {
             method: 'POST',
@@ -373,9 +366,9 @@ SETUP_HTML = """
             },
             body: JSON.stringify({ token: token })
           });
-          
+
           const result = await response.json();
-          
+
           if (response.ok && result.success) {
             showStatus('✅ Token saved successfully! Redirecting...', 'success');
             document.getElementById('successCard').style.display = 'block';
@@ -384,7 +377,7 @@ SETUP_HTML = """
             }, 2000);
           } else {
             let errorMsg = result.error || 'Failed to save token. Please check your token and try again.';
-            
+
                         // Check if this is a model access issue
                                     const defaultModels = __MODEL_JSON__;
                                     const missingModels = result.missing_models || [];
@@ -400,7 +393,7 @@ SETUP_HTML = """
                                                      '</ul>' +
                                                      'Open each link, accept the license, then try saving your token again.';
             }
-            
+
             showStatus(`❌ ${errorMsg}`, 'error');
           }
         } catch (error) {
@@ -410,21 +403,21 @@ SETUP_HTML = """
           saveBtn.textContent = '💾 Save Token';
         }
       }
-      
+
       function showStatus(message, type) {
         const status = document.getElementById('status');
         status.className = `status ${type}`;
         status.innerHTML = message; // Use innerHTML to support HTML content like links
         status.style.display = 'block';
       }
-      
+
       // Allow Enter key to submit
       document.getElementById('token').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
           validateAndSaveToken();
         }
       });
-      
+
       // Auto-focus the token input
       document.getElementById('token').focus();
     </script>
@@ -581,25 +574,25 @@ async def progress_page(job_id: str):
         const date = new Date(timestamp * 1000);
         return date.toLocaleTimeString('en-US', {{ hour: 'numeric', minute: '2-digit', second: '2-digit' }});
       }}
-      
+
       function formatElapsed(seconds) {{
         const mins = seconds / 60;
         return mins.toFixed(1) + ' minutes';
       }}
-      
+
       function formatElapsedShort(seconds) {{
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         if (mins === 0) return secs + 's';
         return mins + 'm ' + secs + 's';
       }}
-      
+
       function updateElapsedTime() {{
         const now = Math.floor(Date.now() / 1000);
         const elapsed = now - {start_time};
         document.getElementById('elapsed-time').innerText = formatElapsed(elapsed);
       }}
-      
+
       function updateProgress() {{
         fetch('/api/job/{job_id}')
           .then(response => response.json())
@@ -607,18 +600,18 @@ async def progress_page(job_id: str):
             document.getElementById('progress-fill').style.width = data.progress + '%';
             document.getElementById('progress-text').innerText = data.progress + '%';
             document.getElementById('status-message').innerText = data.message;
-            
+
             // Update elapsed time
             updateElapsedTime();
-            
+
             if (data.status === 'completed' && data.result) {{
               document.querySelector('.spinner').style.display = 'none';
-              
+
               // Calculate and display completion stats
               const endTime = data.end_time || Math.floor(Date.now() / 1000);
               const elapsed = endTime - data.start_time;
-              
-              document.getElementById('status-container').innerHTML = 
+
+              document.getElementById('status-container').innerHTML =
                 '<div class=\"success\">✅ Transcription completed! <a href=\"' + data.result + '\">View result</a></div>' +
                 '<div class=\"stats\">' +
                 '<div class=\"stats-row\"><strong>Completed at:</strong> <span>' + formatTime(endTime) + '</span></div>' +
@@ -627,7 +620,7 @@ async def progress_page(job_id: str):
                 '<p><a href=\"/list\">View all files</a> | <a href=\"/\">Upload another file</a></p>';
             }} else if (data.status === 'error') {{
               document.querySelector('.spinner').style.display = 'none';
-              document.getElementById('status-container').innerHTML = 
+              document.getElementById('status-container').innerHTML =
                 '<div class=\"error\">❌ Error: ' + data.message + '</div>' +
                 '<p><a href=\"/\">Try again</a></p>';
             }} else {{
@@ -1618,7 +1611,7 @@ async def update_speakers(request: Request):
         vtt_ids = sorted([p.stem for p in vtt_dir.glob("*.vtt") if p.stem.isdigit()],
                          key=lambda x: int(x))
         if vtt_ids:
-          # Map provided new names onto track ids in order; if mapping fewer, 
+          # Map provided new names onto track ids in order; if mapping fewer,
           # reuse last; if more, ignore extras
           new_names = list(speakers_mapping.values())
           for i, sid in enumerate(vtt_ids):
