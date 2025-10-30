@@ -1237,6 +1237,24 @@ def transcribe_video(
       called_by_mercuryweb=called_by_mercuryweb,
       mercury_command=mercury_command,
   )
+  # Try to create a DOCX using the shared html_to_docx helper so the CLI and
+  # the web server use the same conversion code path.
+  try:
+    from transcribe_with_whisper.html_to_docx import ensure_deps, convert_html_file_to_docx
+  except Exception as import_exc:
+    print("⚠️ DOCX generation unavailable: required Python packages are missing. Install with: pip install python-docx")
+    print(f"(import error for html_to_docx: {import_exc})")
+  else:
+    try:
+      if ensure_deps():
+        html_out = Path(f"../{basename}.html")
+        docx_out = html_out.with_suffix('.docx')
+        convert_html_file_to_docx(html_out, docx_out)
+        print(f"✅ Generated DOCX (shared): {docx_out.name}")
+      else:
+        print("⚠️ DOCX generation unavailable: python-docx not installed. Install with: pip install python-docx")
+    except Exception as py_exc:
+      print(f"⚠️ DOCX conversion failed: {py_exc}")
   cleanup([inputWavCache, outputWav] + segment_files)
   print(f"Script completed successfully! Output: ../{basename}.html")
 

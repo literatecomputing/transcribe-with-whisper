@@ -17,6 +17,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Ensure the repository root is on sys.path so `from transcribe_with_whisper.*`
+# imports work when this script is executed directly (e.g. ``python bin/html-to-docx.py``).
+# When Python runs a script, sys.path[0] is the script directory (bin/), which
+# prevents imports like `transcribe_with_whisper` from resolving to the repo
+# package. Prepending the repo root makes local package imports robust.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 
 def main(argv: list[str]) -> int:
     if len(argv) < 2 or len(argv) > 3:
@@ -33,8 +42,7 @@ def main(argv: list[str]) -> int:
     try:
         # Import the shared converter. This will raise ImportError if python-docx
         # (or the shared module) is not available, which we treat as a deps error.
-        from transcribe_with_whisper.html_to_docx import (
-          convert_html_file_to_docx, ensure_deps)
+        from transcribe_with_whisper.html_to_docx import ensure_deps, convert_html_file_to_docx
     except Exception as e:  # broad except to catch ImportError and other import-time failures
         print("Error: missing Python dependencies. Install with: pip install python-docx", file=sys.stderr)
         print(f"(import error: {e})", file=sys.stderr)
@@ -55,4 +63,9 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    # Import sys here to guard against accidental removal or reordering of the
+    # top-level import during edits/formatting. Importing locally keeps this
+    # invocation robust and avoids NameError if the global `sys` is not present.
+    import sys
+
     raise SystemExit(main(sys.argv))
