@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="transcribe-with-whisper",
-    version="0.8.0",
+    version="0.8.1",
     packages=find_packages(),
     install_requires=[
         "pydub==0.25.1",
