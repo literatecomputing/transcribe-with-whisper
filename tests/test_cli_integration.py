@@ -45,6 +45,22 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
     html_text = html.read_text(encoding="utf-8", errors="ignore")
     assert phrase in html_text, f"Phrase not found in HTML: {phrase!r}"
 
+    # The transcription CLI now creates a DOCX itself; verify it exists and contains the phrase
+    docx = work / f"{basename}.docx"
+    assert docx.exists(), "Expected DOCX output missing (the CLI should create a .docx file)"
+    # Verify phrase within DOCX contents (read document.xml from zip)
+    try:
+        with zipfile.ZipFile(docx) as zf:
+            with zf.open('word/document.xml') as f:
+                xml_bytes = f.read()
+        xml_text = xml_bytes.decode('utf-8', errors='ignore')
+        # strip XML tags and unescape entities to get plain text approximation
+        text_only = re.sub(r'<[^>]+>', '', xml_text)
+        text_only = html_module.unescape(text_only)
+        assert phrase in text_only, f"Phrase not found in DOCX text: {phrase!r}"
+    except KeyError:
+        pytest.fail('DOCX missing word/document.xml')
+
     generator_match = re.search(r'<meta name="generator"\s+content="([^"]+)">', html_text)
     assert generator_match, "Generator meta tag missing from CLI HTML output"
     generator_value = generator_match.group(1)
@@ -54,30 +70,7 @@ def test_cli_processes_example_audio(tmp_path: Path, monkeypatch):
     )
     assert version.strip(), "Generator meta tag should include a version suffix"
 
-    # Try DOCX conversion if helper present. Prefer the Python helper on Windows
-    script_py = REPO_ROOT / 'bin' / 'html-to-docx.py'
-    script_sh = REPO_ROOT / 'bin' / 'html-to-docx.sh'
-    if script_py.exists() or script_sh.exists():
-        docx = work / f"{basename}.docx"
-        if script_py.exists():
-            # Run the Python helper with the current interpreter to ensure cross-platform behavior
-            proc2 = subprocess.run([sys.executable, str(script_py), str(html), str(docx)], capture_output=True, text=True)
-        else:
-            proc2 = subprocess.run([str(script_sh), str(html), str(docx)], capture_output=True, text=True)
-        assert proc2.returncode == 0, f"DOCX conversion failed: {proc2.stderr}"
-        assert docx.exists(), "DOCX not created"
-        # Verify phrase within DOCX contents (read document.xml from zip)
-        try:
-            with zipfile.ZipFile(docx) as zf:
-                with zf.open('word/document.xml') as f:
-                    xml_bytes = f.read()
-            xml_text = xml_bytes.decode('utf-8', errors='ignore')
-            # strip XML tags and unescape entities to get plain text approximation
-            text_only = re.sub(r'<[^>]+>', '', xml_text)
-            text_only = html_module.unescape(text_only)
-            assert phrase in text_only, f"Phrase not found in DOCX text: {phrase!r}"
-        except KeyError:
-            pytest.fail('DOCX missing word/document.xml')
+    
 
     # Optionally keep artifacts for inspection
     if os.getenv("KEEP_ARTIFACTS"):
