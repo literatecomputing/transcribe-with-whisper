@@ -76,7 +76,7 @@ def _find_bundled_ffmpeg() -> str | None:
 def _get_embedded_favicon_data_uri() -> str | None:
   """Return the data URI for the bundled square logo favicon."""
   logo_path = Path(
-      __file__).resolve().parent.parent / "branding" / "transcribe-with-whisper-logo-square.svg"
+      __file__).resolve().parent.parent / "branding" / "icon-square.png"
   if not logo_path.exists():
     return None
 
@@ -87,7 +87,7 @@ def _get_embedded_favicon_data_uri() -> str | None:
     return None
 
   encoded = base64.b64encode(svg_bytes).decode("ascii")
-  return f"data:image/svg+xml;base64,{encoded}"
+  return f"data:image/png;base64,{encoded}"
 
 
 def is_apple_silicon() -> bool:

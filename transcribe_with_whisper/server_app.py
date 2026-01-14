@@ -91,7 +91,7 @@ def _prime_token_env() -> str | None:
 
 APP_DIR = Path(__file__).resolve().parent
 BRANDING_DIR = APP_DIR.parent / "branding"
-FAVICON_LINK_TAG = '<link rel="icon" type="image/svg+xml" href="/branding/mercuryscribe-logo.svg">' if BRANDING_DIR.exists(
+FAVICON_LINK_TAG = '<link rel="icon" type="image/png" href="/branding/icon-square.png">' if BRANDING_DIR.exists(
 ) else ''
 
 
@@ -182,6 +182,9 @@ INDEX_HTML = """
   </head>
   <body>
     <div class=\"card\">
+      <div style=\"text-align: center; margin-bottom: 1rem;\">
+        <img src=\"/branding/hero-logo.png\" alt=\"MercuryScribe\" style=\"max-width: 300px; height: auto;\">
+      </div>
       <h1>MercuryScribe</h1>
       <p class=\"tip\">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
       <p class=\"tip\">You can manage or edit files on your computer in <code>~/mercuryscribe</code> or see them here <a href=\"/list\">here</a>.</p>
@@ -254,6 +257,9 @@ SETUP_HTML = """
   </head>
   <body>
     <div class=\"card\">
+      <div style=\"text-align: center; margin-bottom: 1rem;\">
+        <img src=\"/branding/hero-logo.png\" alt=\"MercuryScribe\" style=\"max-width: 300px; height: auto;\">
+      </div>
       <h1>🚀 Welcome to MercuryScribe!</h1>
       <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
 
