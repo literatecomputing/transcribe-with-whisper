@@ -91,15 +91,24 @@ def _prime_token_env() -> str | None:
 
 APP_DIR = Path(__file__).resolve().parent
 BRANDING_DIR = APP_DIR.parent / "branding"
-FAVICON_LINK_TAG = '<link rel="icon" type="image/png" href="/branding/icon-square.png">' if BRANDING_DIR.exists(
-) else ''
 
 
-def _inject_favicon(html: str) -> str:
-  """Insert the favicon link tag after the first </title> if available."""
-  if not FAVICON_LINK_TAG:
-    return html
-  return html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
+# Select best available branding assets
+_main_logo = "ms-logoblock-blue.text.svg" if (BRANDING_DIR / "ms-logoblock-blue.text.svg").exists() else "mercuryscribe-logo.svg"
+_favicon = "ms-logoblock.svg" if (BRANDING_DIR / "ms-logoblock.svg").exists() else "mercuryscribe-logo.svg"
+
+FAVICON_LINK_TAG = f'<link rel="icon" type="image/svg+xml" href="/branding/{_favicon}">' if BRANDING_DIR.exists() else ''
+
+
+def _apply_branding(html: str) -> str:
+  """Inject favicon and replace branding placeholders like {_main_logo}."""
+  if FAVICON_LINK_TAG:
+    html = html.replace("</title>", f"</title>\n    {FAVICON_LINK_TAG}", 1)
+  
+  # Replace logo placeholder if it exists
+  html = html.replace("{_main_logo}", _main_logo)
+  
+  return html
 
 
 # Preferred env var TRANSCRIPTION_DIR; fall back to legacy UPLOAD_DIR; default to HOME ~/mercuryscribe
@@ -181,12 +190,11 @@ INDEX_HTML = """
     </style>
   </head>
   <body>
-    <div class=\"card\">
-      <div style=\"text-align: center; margin-bottom: 1rem;\">
-        <img src=\"/branding/hero-logo.png\" alt=\"MercuryScribe\" style=\"max-width: 300px; height: auto;\">
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1.5rem;">
+        <img src="/branding/{_main_logo}" alt="MercuryScribe Logo" style="max-height: 200px; width: auto; display: block;">
       </div>
-      <h1>MercuryScribe</h1>
-      <p class=\"tip\">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
+      <p class="tip">Upload a video/audio file. The server will run diarization and transcription, then return an interactive HTML transcript.</p>
       <p class=\"tip\">You can manage or edit files on your computer in <code>~/mercuryscribe</code> or see them here <a href=\"/list\">here</a>.</p>
       <form action=\"/upload\" method=\"post\" enctype=\"multipart/form-data\" onsubmit=\"document.getElementById('submit').disabled = true; document.getElementById('submit').innerText='Processing…';\">
         <input type=\"file\" name=\"file\" accept=\"video/*,audio/*\" required>
@@ -256,11 +264,11 @@ SETUP_HTML = """
     </style>
   </head>
   <body>
-    <div class=\"card\">
-      <div style=\"text-align: center; margin-bottom: 1rem;\">
-        <img src=\"/branding/hero-logo.png\" alt=\"MercuryScribe\" style=\"max-width: 300px; height: auto;\">
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1.5rem;">
+        <img src="/branding/{_main_logo}" alt="MercuryScribe Logo" style="max-height: 200px; width: auto; display: block;">
       </div>
-      <h1>🚀 Welcome to MercuryScribe!</h1>
+      <h2>🚀 Welcome!</h2>
       <p>Before you can start transcribing, we need to set up your HuggingFace access token. This enables the AI models for speaker diarization and transcription.</p>
 
     </div>
@@ -436,7 +444,7 @@ SETUP_HTML = """
 async def index(_: Request):
   if not _has_valid_token():
     return RedirectResponse(url="/setup", status_code=303)
-  return HTMLResponse(_inject_favicon(INDEX_HTML))
+  return HTMLResponse(_apply_branding(INDEX_HTML))
 
 
 @app.get("/setup", response_class=HTMLResponse)
@@ -554,7 +562,7 @@ async def progress_page(job_id: str):
     duration_str = "Unknown duration"
 
   return HTMLResponse(
-      _inject_favicon(f"""
+      _apply_branding(f"""
 <!doctype html>
 <html>
   <head>
@@ -639,8 +647,11 @@ async def progress_page(job_id: str):
     </script>
   </head>
   <body>
-    <div class=\"card\">
-      <h1>Transcribing: {job['filename']}</h1>
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1.5rem;">
+        <img src="/branding/{_main_logo}" alt="MercuryScribe Logo" style="max-height: 200px; width: auto; display: block;">
+      </div>
+      <h2>Transcribing: {job['filename']}</h2>
       <div class=\"stats\">
         <div class=\"stats-row\"><strong>Started:</strong> <span>{start_time_str}</span></div>
         <div class=\"stats-row\"><strong>Audio length:</strong> <span>{duration_str}</span></div>
@@ -768,7 +779,7 @@ def _render_setup_html() -> str:
   html = SETUP_HTML
   html = html.replace("__MODEL_LIST_ITEMS__", "\n".join(list_items))
   html = html.replace("__MODEL_JSON__", model_json)
-  return _inject_favicon(html)
+  return _apply_branding(html)
 
 
 def _probe_model_access(model: Dict[str, str], token: str) -> Optional[str]:
@@ -1110,7 +1121,17 @@ def _update_progress_from_output(job_id: str, line: str):
     # Error detection
     elif any(error_word in line.upper()
              for error_word in ["ERROR", "FAILED", "EXCEPTION", "TRACEBACK"]):
-      jobs[job_id]["message"] = f"Error: {line[:100]}..."
+      # Skip common non-fatal warnings that might contain these words
+      norm_line = line.lower()
+      skip_warnings = [
+          "torchcodec", "libtorchcodec", "userwarning", "futurewarning", "deprecationwarning",
+          "skipping copy", "branding assets not found", "ffmpeg version", "libavutil",
+          "libpython", "loading traceback", "not installed correctly"
+      ]
+      if any(skip in norm_line for skip in skip_warnings):
+        pass
+      else:
+        jobs[job_id]["message"] = f"Error: {line[:100]}..."
 
     # Progress safety: Ensure we never go backwards and don't stall
     else:
@@ -1350,7 +1371,7 @@ async def list_files(_: Request):
         f"<tr><td>{name}</td><td style='text-align:right'>{size}</td><td>{mtime}</td><td>{' | '.join(actions)}</td></tr>"
     )
 
-  html = _inject_favicon(f"""
+  html = _apply_branding(f"""
 <!doctype html>
 <html>
   <head>

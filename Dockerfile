@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install architecture-specific requirements
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        echo "=== Building for ARM64 - using pyannote.audio 3.4.0 (no torchcodec required) ==="; \
+        echo "=== Building for ARM64 - using pyannote.audio 3.4.0 (stable) ==="; \
         pip install --no-cache-dir -r requirements-arm64.txt; \
     else \
         echo "=== Building for AMD64 - using pyannote.audio 4.0.0 (with torchcodec) ==="; \
@@ -62,6 +62,8 @@ dst = package_root / 'branding'
 
 if not src.is_dir():
     print("⚠️ Branding assets not found at /app/branding; skipping copy.")
+elif src.resolve() == dst.resolve():
+    print("✅ Branding assets already in destination; skipping copy.")
 else:
     try:
         if dst.exists():

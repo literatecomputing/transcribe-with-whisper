@@ -12,6 +12,31 @@ REQUIRED_LIBS = [
     "webvtt",
 ]
 
+# Torch 2.6+ weights_only compatibility for pyannote.audio
+try:
+    import torch
+    if hasattr(torch.serialization, "add_safe_globals"):
+        # We need to allow-list pyannote classes used in model checkpoints
+        # to avoid WeightsUnpickler error in Torch 2.6+
+        safe_types = []
+        try:
+            from pyannote.audio.core.task import Specifications, Problem, Resolution
+            safe_types.extend([Specifications, Problem, Resolution])
+        except ImportError:
+            pass
+            
+        try:
+            # Sometimes used in older or specific models
+            from pyannote.database.protocol.protocol import Protocol
+            safe_types.append(Protocol)
+        except ImportError:
+            pass
+
+        if safe_types:
+            torch.serialization.add_safe_globals(safe_types)
+except ImportError:
+    pass
+
 
 def check_platform_notes():
   system = platform.system()
