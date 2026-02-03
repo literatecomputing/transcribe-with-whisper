@@ -17,7 +17,7 @@ Two ways to use this project:
 - MercuryScribe (Web UI)
 
   - Best for editing and reviewing in your browser
-  - Programmer Install: `pip install "transcribe-with-whisper[web]"`
+  - Programmer Install: `pip install "transcribe-with-whisper"`
   - Docker Install:
 
   ```
